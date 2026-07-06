@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MusicmaniA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Roboto+Flex:opsz,wght@8..144,400;8..144,500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --md-sys-color-background: #141218;
+      --md-sys-color-on-background: #E6E0E9;
+      --md-sys-color-surface-container: #211F26;
+      --md-sys-color-primary: #D0BCFF;
+      --md-sys-color-on-primary: #381E72;
+      --md-sys-color-secondary-container: #4A4458;
+      --md-sys-color-tertiary: #EFB8C8;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Roboto Flex', system-ui, sans-serif;
+      background-color: var(--md-sys-color-background);
+      color: var(--md-sys-color-on-background);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background-image: 
+        radial-gradient(circle at 15% 50%, rgba(208, 188, 255, 0.08), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(239, 184, 200, 0.08), transparent 25%);
+    }
+
+    .m3-card {
+      background-color: var(--md-sys-color-surface-container);
+      border-radius: 32px;
+      padding: 48px 32px;
+      max-width: 540px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .avatar-container {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 24px;
+      border-radius: 9999px;
+      background-color: var(--md-sys-color-secondary-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .avatar-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.75rem;
+      font-weight: 700;
+      line-height: 3.25rem;
+      margin-bottom: 8px;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--md-sys-color-tertiary);
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+
+    .description {
+      font-size: 1.05rem;
+      line-height: 1.6rem;
+      color: #CAC4D0;
+      margin-bottom: 36px;
+      padding: 0 12px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 32px;
+      height: 56px;
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-weight: 500;
+      font-size: 1.05rem;
+      border-radius: 28px;
+      text-decoration: none;
+      transition: background-color 0.2s, transform 0.2s;
+    }
+
+    .btn-primary:hover {
+      background-color: #E8DEF8;
+      transform: translateY(-2px);
+    }
+
+    .stats-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 36px;
+      padding: 12px 20px;
+      background-color: rgba(230, 224, 233, 0.05);
+      border-radius: 16px;
+      font-size: 0.95rem;
+      color: #CAC4D0;
+    }
+
+    .stats-chip span {
+      color: var(--md-sys-color-primary);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    @media (max-width: 600px) {
+      .m3-card { padding: 36px 20px; }
+      h1 { font-size: 2.25rem; line-height: 2.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="m3-card">
+    
+    <h1>MusicmaniA</h1>
+    <div class="subtitle">От ретро-хитов до свежих релизов</div>
+    <div class="description">
+      Слушай золотую классику, новую музыку, а также лучшие саундтреки из фильмов и видеоигр. Эксклюзивные миксы и живое общение для настоящих ценителей звука.
+    </div>
+    
+    <a href="https://t.me/oldmusicmania" class="btn-primary" target="_blank">
+      Подписаться →
+    </a>
+    
+    <div class="stats-chip">
+      📊 <span id="sub-count">6000+</span> участников
+    </div>
+  </div>
+
+  <script>
+    // Теперь мы читаем обычный json, который Nginx отдаст молниеносно
+    async function fetchSubscriberCount() {
+      const counterElement = document.getElementById('sub-count');
+      try {
+        const response = await fetch('/api/subscribers.json');
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.count) {
+            // Форматируем с пробелами: 6123 -> 6 123
+            counterElement.innerText = parseInt(data.count).toLocaleString('ru-RU');
+          }
+        }
+      } catch (error) {
+        console.warn('Не удалось загрузить счетчик.');
+      }
+    }
+
+    fetchSubscriberCount();
+  </script>
+</body>
+</html>
