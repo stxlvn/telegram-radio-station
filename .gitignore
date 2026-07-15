@@ -1,0 +1,16 @@
+# Real secrets -- only .env.example belongs in the repo
+.env
+/etc/musicbestman/
+
+# Telegram auth sessions -- as sensitive as a password, never commit
+*.session
+*.session-journal
+session.lock
+
+# Runtime data / caches, not source
+__pycache__/
+*.pyc
+*.part
+
+# OS/editor cruft
+.DS_Store

@@ -1,0 +1,14 @@
+[Unit]
+Description=MusicmaniA Radio Watchdog (auto-restart on service/playback failure)
+After=network.target icecast2.service radio.service tgstream.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/radio
+EnvironmentFile=-/etc/musicbestman/env
+ExecStart=/opt/radio/venv/bin/python /opt/radio/monitor.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

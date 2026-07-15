@@ -1,0 +1,15 @@
+[Unit]
+Description=Periodic Telegram channel subscriber count updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tgstream
+EnvironmentFile=/etc/musicbestman/env
+ExecStart=/opt/radio/venv/bin/python /opt/tgstream/update_subscriber_count.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

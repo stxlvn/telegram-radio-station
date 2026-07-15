@@ -1,0 +1,15 @@
+[Unit]
+Description=Telegram RTMP broadcast for MusicmaniA channel
+After=network-online.target radio.service icecast2.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tgstream
+EnvironmentFile=/etc/musicbestman/env
+ExecStart=/bin/bash /opt/tgstream/stream.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

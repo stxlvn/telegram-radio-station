@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MusicmaniA</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,400;8..144,500;8..144,700&family=Noto+Sans:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'Product Sans';
+      src: url('/fonts/ProductSansRegular.woff2') format('woff2');
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Product Sans';
+      src: url('/fonts/ProductSansBold.woff2') format('woff2');
+      font-weight: 700;
+      font-display: swap;
+    }
+    :root {
+      --md-sys-color-background: #171111;
+      --md-sys-color-surface-container: #251B1A;
+      --md-sys-color-on-surface: #EDE0DF;
+      --md-sys-color-on-surface-variant: #D4C3C2;
+      --md-sys-color-primary: #FFB3AC;
+      --md-sys-color-on-primary: #68000A;
+      --md-sys-color-primary-container: #930012;
+      --md-sys-color-tertiary: #FFD27A;
+      --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+      --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+      --md-sys-motion-duration-long2: 500ms;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Product Sans', 'Roboto Flex', system-ui, sans-serif;
+      background-color: var(--md-sys-color-background);
+      color: var(--md-sys-color-on-surface);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 20px;
+      padding: 24px;
+      background-image: radial-gradient(ellipse at 15% 15%, rgba(255, 179, 172, 0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 85% 85%, rgba(255, 210, 122, 0.06) 0%, transparent 50%);
+    }
+
+    .layout {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 20px;
+      width: 100%;
+      max-width: 1400px;
+      margin: auto;
+    }
+
+    @media (max-width: 860px) {
+      .layout { flex-direction: column; align-items: center; }
+    }
+
+    @keyframes m3-card-enter {
+      from { opacity: 0; transform: scale(0.95) translateY(20px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    @keyframes m3-stagger-enter {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .m3-card {
+      background-color: var(--md-sys-color-surface-container);
+      border-radius: 32px;
+      padding: 40px 32px;
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+      animation: m3-card-enter var(--md-sys-motion-duration-long2) var(--md-sys-motion-easing-emphasized-decelerate) forwards;
+      flex-shrink: 1;
+      min-width: 0;
+    }
+
+    .stagger-item {
+      opacity: 0;
+      animation: m3-stagger-enter var(--md-sys-motion-duration-long2) var(--md-sys-motion-easing-emphasized) forwards;
+    }
+
+    .delay-1 { animation-delay: 50ms; }
+    .delay-2 { animation-delay: 100ms; }
+    .delay-3 { animation-delay: 150ms; }
+    .delay-4 { animation-delay: 200ms; }
+
+    .avatar-container {
+      width: 112px; height: 112px; margin: 0 auto 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.4s var(--md-sys-motion-easing-emphasized);
+    }
+    .avatar-container img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+    h1 { font-family: 'Product Sans', 'Roboto Flex', sans-serif; font-size: clamp(1.7rem, 9vw, 2.75rem); font-weight: 700; margin-bottom: 8px; color: var(--md-sys-color-on-surface); }
+    .subtitle { font-size: 1.25rem; color: var(--md-sys-color-tertiary); margin-bottom: 18px; }
+
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: left;
+      margin-bottom: 30px;
+    }
+    .feature-row { display: flex; align-items: center; gap: 12px; }
+    .feature-icon {
+      width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+      background-color: rgba(255, 179, 172, 0.12);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .feature-icon svg { width: 21px; height: 21px; fill: var(--md-sys-color-primary); }
+    .feature-row span:last-child {
+      font-size: 0.92rem; line-height: 1.45; color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .btn-telegram {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      padding: 14px 28px;
+      border-radius: 100px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: 0.2s;
+      max-width: 280px;
+      width: 100%;
+      margin: 0 auto;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(255, 179, 172, 0.3);
+    }
+    .btn-telegram svg {
+      width: 20px;
+      height: 20px;
+      display: inline-block;
+      flex-shrink: 0;
+      vertical-align: middle;
+      overflow: visible;
+    }
+
+    .stats-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin: 0 0 26px; padding: 8px 20px; border-radius: 100px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.95rem; color: var(--md-sys-color-on-surface-variant);
+    }
+    .stats-badge svg { width: 18px; height: 18px; fill: var(--md-sys-color-primary); }
+
+    .btn-radio {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background-color: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-primary);
+      padding: 14px 32px;
+      border-radius: 100px;
+      border: none;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.1rem;
+      transition: 0.2s;
+      max-width: 320px;
+      width: 100%;
+      margin: 0 auto;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-radio svg { width: 22px; height: 22px; flex-shrink: 0; fill: currentColor; }
+
+    /* Quality selector: M3 Expressive shape-morph button group -- full pill
+       on the outer edges, near-square corner where the two segments meet. */
+    .quality-toggle {
+      display: flex;
+      gap: 4px;
+      max-width: 320px;
+      width: 100%;
+      margin: 18px auto 0;
+    }
+    .quality-btn {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background-color: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .quality-btn:first-child { border-radius: 100px 10px 10px 100px; }
+    .quality-btn:last-child { border-radius: 10px 100px 100px 10px; }
+    .quality-btn.active {
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border-color: transparent;
+    }
+    .quality-btn .quality-sub { opacity: 0.75; font-weight: 400; }
+
+    .side-links {
+      max-width: 320px;
+      width: 100%;
+      margin: 24px auto 0;
+      text-align: center;
+      font-size: 0.75rem;
+    }
+    .side-links a {
+      color: var(--md-sys-color-on-surface-variant);
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 255, 255, 0.25);
+      text-underline-offset: 2px;
+    }
+    .side-links-dot { margin: 0 6px; color: var(--md-sys-color-on-surface-variant); opacity: 0.5; }
+
+    .snackbar {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(80px);
+      max-width: 90vw;
+      width: 360px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background-color: #3a2c2b;
+      color: var(--md-sys-color-on-surface);
+      padding: 14px 18px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s var(--md-sys-motion-easing-emphasized),
+                  transform 0.25s var(--md-sys-motion-easing-emphasized);
+      z-index: 300;
+    }
+    .snackbar.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    .snackbar svg { width: 20px; height: 20px; flex-shrink: 0; fill: var(--md-sys-color-tertiary); }
+
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 320px;
+      width: 100%;
+      margin: 10px auto 14px;
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+    }
+    .volume-row.visible { opacity: 1; max-height: 40px; margin: 10px auto 14px; }
+    .volume-row svg { width: 18px; height: 18px; fill: var(--md-sys-color-on-surface-variant); flex-shrink: 0; }
+    .volume-row input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+    }
+    .volume-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--md-sys-color-primary);
+      cursor: pointer;
+    }
+    .volume-row input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%; border: none;
+      background: var(--md-sys-color-primary);
+      cursor: pointer;
+    }
+
+    .on-air-label {
+      max-width: 320px;
+      width: 100%;
+      margin: 12px auto 8px;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .on-air-label-first { margin-top: 0; }
+
+    .now-playing {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 320px;
+      width: 100%;
+      margin: 0 auto 14px;
+      padding: 8px;
+      border-radius: 16px;
+      background-color: rgba(255, 255, 255, 0.04);
+      text-align: left;
+      text-decoration: none;
+      color: inherit;
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      cursor: pointer;
+      transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease, background-color 0.2s ease;
+    }
+    .now-playing.visible { display: flex; opacity: 1; max-height: 96px; margin: 0 auto 14px; }
+    .now-playing img {
+      width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
+      background-color: var(--md-sys-color-primary-container);
+      transition: opacity 0.25s ease;
+    }
+    .now-playing .np-text { min-width: 0; width: 100%; }
+    .now-playing .np-title, .now-playing .np-artist {
+      transition: opacity 0.25s ease;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .now-playing .np-title { font-size: 0.9rem; font-weight: 600; color: var(--md-sys-color-on-surface); }
+    .now-playing .np-artist { font-size: 0.8rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 6px; }
+    .np-fading img, .np-fading .np-title, .np-fading .np-artist,
+    .np-fading .np-progress-track, .np-fading .np-time { opacity: 0; }
+    .player-fading .player-cover-wrap, .player-fading .player-title, .player-fading .player-artist,
+    .player-fading .player-progress-track, .player-fading .player-time-row { opacity: 0; }
+    .player-cover-wrap, .player-title, .player-artist, .player-progress-track, .player-time-row {
+      transition: opacity 0.25s ease;
+    }
+
+    .np-progress-track {
+      width: 100%; height: 3px; border-radius: 2px;
+      background-color: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+      transition: opacity 0.25s ease;
+    }
+    .np-progress-fill {
+      height: 100%; width: 0%;
+      background-color: var(--md-sys-color-primary);
+      border-radius: 2px;
+      transition: width 0.5s linear;
+    }
+    .np-time {
+      font-size: 0.68rem; color: var(--md-sys-color-on-surface-variant);
+      margin-top: 3px;
+      transition: opacity 0.25s ease;
+    }
+
+    /* Queue panel */
+    .queue-panel {
+      background-color: transparent;
+      border-radius: 32px;
+      padding: 28px 20px;
+      max-width: 320px;
+      width: 100%;
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      transition: opacity 0.35s ease, max-height 0.35s ease, padding 0.35s ease;
+      animation: m3-card-enter var(--md-sys-motion-duration-long2) var(--md-sys-motion-easing-emphasized-decelerate) forwards;
+    }
+    .queue-panel.visible { opacity: 1; max-height: 4000px; }
+    .queue-panel h2 {
+      font-family: 'Product Sans', 'Roboto Flex', sans-serif; font-size: 1.1rem; font-weight: 700;
+      margin-bottom: 16px; color: var(--md-sys-color-on-surface-variant);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .queue-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .queue-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px; border-radius: 14px;
+      text-decoration: none; color: inherit;
+      transition: background-color 0.2s ease, opacity 0.35s ease, transform 0.35s ease;
+      animation: m3-stagger-enter 0.4s var(--md-sys-motion-easing-emphasized) forwards;
+    }
+    .queue-item .qi-num {
+      width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+      background-color: rgba(255, 255, 255, 0.08);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant);
+    }
+    .queue-item .qi-text { min-width: 0; }
+    .queue-item .qi-title {
+      font-size: 0.85rem; font-weight: 600; color: var(--md-sys-color-on-surface);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .queue-item .qi-artist {
+      font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Expanded player modal */
+    /* Mobile: collapsed by default, tapping #now-playing reveals this in
+       place (accordion-style, not an overlay). Desktop overrides further
+       down to always show it and drop the compact bar entirely. */
+    .player-inline {
+      text-align: left;
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      pointer-events: none;
+      transition: max-height 0.35s ease, opacity 0.3s ease, margin 0.35s ease;
+    }
+    .player-inline.expanded {
+      max-height: 900px;
+      opacity: 1;
+      pointer-events: auto;
+      margin-top: 14px;
+    }
+    .player-inline-header { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+
+    /* Mobile: expanding takes over the whole screen instead of just
+       growing in place -- more room for the cover, easier to reach the
+       controls one-handed than a panel wedged into the card's own width. */
+    @media (max-width: 860px) {
+      /* .closing keeps the same fixed full-screen box as .expanded (so it
+         stays visible in place) but is added right as .expanded is removed,
+         letting opacity/transform actually transition -- position itself
+         can't be animated, so without this the overlay used to just vanish
+         instantly the moment .expanded came off. JS strips .closing once
+         the transition finishes. */
+      .player-inline.expanded,
+      .player-inline.closing {
+        position: fixed;
+        inset: 0;
+        z-index: 300;
+        max-height: none;
+        margin: 0;
+        padding: 16px 20px 24px;
+        background-color: var(--md-sys-color-surface-container);
+        overflow-y: hidden;
+        /* Plain block flow, not display:flex -- flex-direction:column
+           with a fixed-size cover (flex-shrink:0, so it never yields
+           space) left the flex algorithm squeezing OTHER children down to
+           make room whenever total content exceeded the viewport height.
+           The progress track (an empty div with no content to floor its
+           min-height) got crushed to 0px this way -- present in the DOM,
+           computed height 0, invisible. Block flow doesn't have a shrink
+           step at all: every child renders at its own natural height.
+           No scrolling either now -- JS (fitMobilePlayerCover) sizes the
+           cover to whatever's actually left over after every other row
+           takes its natural height, so the whole thing always fits in one
+           screen instead of needing to scroll. */
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+      .player-inline.closing {
+        opacity: 0;
+        transform: translateY(16px);
+        pointer-events: none;
+      }
+      .player-inline.expanded .player-cover-wrap,
+      .player-inline.closing .player-cover-wrap { margin-left: auto; margin-right: auto; width: 100%; }
+    }
+
+    .player-icon-btn {
+      width: 46px; height: 46px; border-radius: 50%; border: none;
+      background-color: transparent; color: var(--md-sys-color-on-surface-variant);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background-color 0.2s ease;
+    }
+    .player-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+    .player-icon-btn svg { width: 27px; height: 27px; fill: currentColor; }
+
+    .player-cover-wrap {
+      /* aspect-ratio, not padding-bottom:100% -- percentage padding is
+         resolved against the CONTAINING BLOCK's width (the parent), not
+         this element's own width. Once max-width caps this element
+         narrower than its parent (desktop: 220px vs a ~350-400px parent),
+         padding-bottom:100% produced a box sized off the parent instead,
+         turning the square into a tall rectangle. aspect-ratio sizes
+         purely from the element's own resolved width, so it stays square
+         under any max-width.
+      */
+      width: 100%; aspect-ratio: 1 / 1; flex-shrink: 0; border-radius: 20px; overflow: hidden;
+      margin-bottom: 18px; background-color: var(--md-sys-color-primary-container);
+    }
+    .player-cover-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .player-title {
+      font-size: 1.2rem; font-weight: 700; color: var(--md-sys-color-on-surface);
+      margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .player-artist {
+      font-size: 0.95rem; color: var(--md-sys-color-on-surface-variant);
+      margin-bottom: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .player-progress-track {
+      width: 100%; height: 4px; border-radius: 2px;
+      background-color: rgba(255, 255, 255, 0.12); overflow: hidden;
+    }
+    .player-progress-fill {
+      height: 100%; width: 0%; background-color: var(--md-sys-color-primary);
+      border-radius: 2px; transition: width 0.5s linear;
+    }
+    .player-time-row {
+      display: flex; justify-content: space-between; font-size: 0.75rem;
+      color: var(--md-sys-color-on-surface-variant); margin-top: 6px; margin-bottom: 22px;
+    }
+
+    .player-status {
+      display: none;
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--md-sys-color-on-surface-variant);
+      margin: -8px 0 14px;
+    }
+    .player-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .player-controls-center { display: flex; align-items: center; justify-content: center; gap: 28px; }
+    .player-ctrl-btn {
+      width: 46px; height: 46px; border-radius: 50%; border: none; background-color: transparent;
+      color: var(--md-sys-color-on-surface); display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background-color 0.2s ease;
+    }
+    .player-ctrl-btn svg { width: 26px; height: 26px; fill: currentColor; }
+    .player-ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+    .player-play-btn {
+      width: 64px; height: 64px; border-radius: 50%; border: none;
+      background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .player-play-btn svg { width: 28px; height: 28px; fill: currentColor; }
+
+    .player-volume-wrap { position: relative; flex-shrink: 0; }
+    .player-volume-popup {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      right: 0;
+      background-color: #3a2c2b;
+      border-radius: 14px;
+      padding: 14px 0 16px;
+      width: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 10;
+    }
+    .player-volume-popup.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .player-volume-popup input[type="range"] {
+      writing-mode: vertical-lr;
+      direction: rtl;
+      appearance: none;
+      -webkit-appearance: none;
+      width: 4px;
+      height: 100px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+    }
+    .player-volume-popup input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--md-sys-color-primary);
+      cursor: pointer;
+    }
+    .player-volume-popup input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%; border: none;
+      background: var(--md-sys-color-primary);
+      cursor: pointer;
+    }
+
+    .player-next {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.82rem;
+    }
+    .player-next.visible { display: flex; }
+    .player-next-label {
+      flex-shrink: 0;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--md-sys-color-on-surface-variant);
+      opacity: 0.7;
+    }
+    .player-next-track {
+      color: var(--md-sys-color-on-surface);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 420px) {
+      .player-cover-wrap { margin-bottom: 14px; }
+      .player-controls-center { gap: 20px; }
+    }
+
+    @media (max-width: 860px) {
+      .queue-panel { max-width: 500px; }
+    }
+
+    /* Desktop: the player is always shown expanded inline in the card, no
+       tap-to-expand -- hide the compact trigger bar and its collapse
+       button, and force .player-inline visible regardless of .expanded. */
+    @media (min-width: 861px) {
+      #now-playing { display: none !important; }
+      .player-inline-header { display: none; }
+      .player-inline {
+        max-height: none !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        margin-top: 14px;
+      }
+      .on-air-label { text-align: center; }
+      .player-cover-wrap { max-width: 220px; margin-left: auto; margin-right: auto; }
+      .player-status { display: block; }
+      .player-next { display: none !important; }
+    }
+
+    @media (max-width: 420px) {
+      body { padding: 16px; }
+      .m3-card { padding: 32px 20px; }
+      .subtitle { font-size: 1.1rem; }
+      .feature-row span:last-child { font-size: 0.85rem; }
+      .btn-radio { font-size: 0.85rem; padding: 12px 12px; gap: 6px; }
+      .btn-radio svg { width: 20px; height: 20px; }
+      .btn-telegram { font-size: 0.8rem; padding: 8px 14px; }
+      .quality-btn { font-size: 0.75rem; padding: 9px 10px; }
+      .side-links { font-size: 0.62rem; white-space: nowrap; }
+      .side-links-dot { margin: 0 3px; }
+      .now-playing { max-width: 100%; }
+      .snackbar { width: calc(100% - 32px); font-size: 0.85rem; padding: 12px 14px; }
+    }
+
+    /* Hover styles only for devices with a real pointer -- on touch, a tap
+       triggers :hover with no matching "leave" event, so buttons stayed
+       visually stuck in their hovered/pressed look until something else was
+       tapped. Scoping to (hover: hover) keeps this purely a mouse thing. */
+    @media (hover: hover) and (pointer: fine) {
+      .avatar-container:hover { transform: scale(1.05); }
+      .btn-telegram:hover {
+        background-color: #f5a59e;
+        transform: scale(1.02);
+        box-shadow: 0 6px 20px rgba(255, 179, 172, 0.5);
+      }
+      .btn-radio:hover { background-color: #ab0a1e; }
+      .side-links a:hover { color: var(--md-sys-color-primary); }
+      .now-playing:hover { background-color: rgba(255, 255, 255, 0.08); }
+      .queue-item:hover { background-color: rgba(255, 255, 255, 0.06); }
+      .player-icon-btn:hover { background-color: rgba(255, 255, 255, 0.08); }
+      .player-ctrl-btn:hover { background-color: rgba(255, 255, 255, 0.08); }
+      .player-play-btn:hover { transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+  <div class="m3-card card-about">
+    <div class="avatar-container stagger-item delay-1">
+      <img src="/avatar.jpg" alt="MusicmaniA">
+    </div>
+    <h1 class="stagger-item delay-2">MusicmaniA</h1>
+    <div class="subtitle stagger-item delay-3">От ретро-хитов до свежих релизов</div>
+
+    <div class="stats-badge stagger-item delay-3">
+      <svg viewBox="0 0 24 24"><path d="M7 20h4V4H7v16zm-6 0h4v-8H1v8zm12 0h4v-12h-4v12z"/></svg>
+      <span>Нас уже: <span id="sub-count">6 000</span></span>
+    </div>
+
+    <div class="feature-list stagger-item delay-4">
+      <div class="feature-row">
+        <span class="feature-icon"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></span>
+        <span>Классика, новинки и редкие саундтреки из фильмов и игр — в эфире круглые сутки</span>
+      </div>
+      <div class="feature-row">
+        <span class="feature-icon"><svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg></span>
+        <span>Серверы в нескольких странах — плеер и треки грузятся быстро отовсюду</span>
+      </div>
+      <div class="feature-row">
+        <span class="feature-icon"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v4l4-4h8c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>
+        <span>Эксклюзивные миксы и живое общение для настоящих ценителей звука</span>
+      </div>
+    </div>
+
+    <div class="stagger-item delay-4">
+      <a href="https://t.me/your_channel" target="_blank" class="btn-telegram">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 26 26" width="26" height="26">
+          <circle cx="12" cy="12" r="12" fill="#24A1DE"></circle>
+          <path fill="#ffffff" d="M5.939 12.066l10.998-4.25c.508-.188.956.115.779.894l-1.854 8.718c-.138.614-.492.763-.993.48l-2.746-2.023-1.325 1.274c-.146.146-.269.269-.551.269l.197-2.791 5.083-4.59c.221-.196-.049-.304-.344-.105l-6.282 3.951-2.706-.844c-.588-.184-.6-.589.122-.872z"></path>
+        </svg>
+        Подписаться
+      </a>
+    </div>
+  </div>
+
+  <div class="m3-card card-broadcast">
+    <div class="stagger-item delay-4">
+      <div class="on-air-label on-air-label-first">В эфире</div>
+
+      <!-- Mobile: compact summary bar, tap to expand the full player below.
+           Desktop: hidden entirely -- .player-inline is always shown there. -->
+      <div id="now-playing" class="now-playing" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
+        <img id="np-cover" src="" alt="">
+        <div class="np-text">
+          <div id="np-title" class="np-title"></div>
+          <div id="np-artist" class="np-artist"></div>
+          <div class="np-progress-track"><div id="np-progress-fill" class="np-progress-fill"></div></div>
+          <div class="np-time"><span id="np-elapsed">0:00</span> / <span id="np-duration">0:00</span></div>
+        </div>
+      </div>
+
+      <div id="player-inline" class="player-inline">
+        <div class="player-inline-header">
+          <button type="button" id="player-collapse" class="player-icon-btn" title="Свернуть плеер" aria-label="Свернуть плеер">
+            <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"></path></svg>
+          </button>
+        </div>
+        <div class="player-cover-wrap">
+          <img id="player-cover" src="" alt="">
+        </div>
+        <div class="player-title" id="player-title"></div>
+        <div class="player-artist" id="player-artist"></div>
+        <div class="player-progress-track"><div id="player-progress-fill" class="player-progress-fill"></div></div>
+        <div class="player-time-row">
+          <span id="player-elapsed">0:00</span>
+          <span id="player-duration">0:00</span>
+        </div>
+        <div class="player-status" id="player-status">Пауза</div>
+        <div class="player-controls">
+          <button type="button" id="player-copy-link" class="player-ctrl-btn" title="Копировать ссылку на трек в канале" aria-label="Копировать ссылку на трек">
+            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg>
+          </button>
+          <div class="player-controls-center">
+            <button type="button" id="player-rewind" class="player-ctrl-btn" title="Перемотать на 10 секунд назад" aria-label="Перемотать на 10 секунд назад">
+              <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"></path></svg>
+            </button>
+            <button type="button" id="player-playpause" class="player-play-btn" title="Играть" aria-label="Играть / пауза">
+              <svg id="player-playpause-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+            </button>
+            <button type="button" id="player-live" class="player-ctrl-btn" title="Вернуться к прямому эфиру" aria-label="Вернуться к прямому эфиру">
+              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>
+            </button>
+          </div>
+          <div class="player-volume-wrap">
+            <button type="button" id="player-volume-btn" class="player-ctrl-btn" title="Громкость" aria-label="Громкость">
+              <svg id="player-volume-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>
+            </button>
+            <div class="player-volume-popup" id="player-volume-popup">
+              <input type="range" id="player-volume-slider" min="0" max="100" value="80" orient="vertical">
+            </div>
+          </div>
+        </div>
+        <div class="quality-toggle" id="quality-toggle">
+          <button type="button" class="quality-btn active" data-quality="mp3">MP3</button>
+          <button type="button" class="quality-btn" data-quality="flac">FLAC <span class="quality-sub">lossless</span></button>
+        </div>
+        <div class="player-next" id="player-next">
+          <span class="player-next-label">Далее</span>
+          <span class="player-next-track" id="player-next-track"></span>
+        </div>
+      </div>
+      <audio id="radio-audio" preload="none"></audio>
+    </div>
+    <div class="side-links stagger-item delay-4">
+      <a href="/radio/stream" target="_blank">MP3-поток</a>
+      <span class="side-links-dot">·</span>
+      <a href="/musicsmania.m3u" download>M3U</a>
+      <span class="side-links-dot">·</span>
+      <a href="/radio/stream.flac" target="_blank">FLAC-поток</a>
+      <span class="side-links-dot">·</span>
+      <a href="/musicsmania-flac.m3u" download>FLAC M3U</a>
+    </div>
+  </div>
+
+  <div id="queue-panel" class="queue-panel">
+    <h2>Дальше в эфире</h2>
+    <ul id="queue-list" class="queue-list"></ul>
+  </div>
+  </div>
+
+  <div id="snackbar" class="snackbar">
+    <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"></path></svg>
+    <span>FLAC расходует в 6-8 раз больше трафика, чем MP3</span>
+  </div>
+
+  <script src="/hls.min.js"></script>
+  <script>
+    async function fetchSubscriberCount() {
+      const counterElement = document.getElementById('sub-count');
+      const url = '/api/subscribers.json';
+      try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP error ' + response.status);
+        const data = await response.json();
+        if (data && data.count) {
+          counterElement.innerText = parseInt(data.count).toLocaleString('ru-RU');
+        }
+      } catch (e) {
+        console.error('Ошибка получения подписчиков:', e);
+      }
+    }
+    window.addEventListener('load', fetchSubscriberCount);
+    window.addEventListener('focus', fetchSubscriberCount);
+
+    // .m3-card/.queue-panel/.stagger-item entrance animations end on a
+    // non-"none" transform (scale(1)/translateY(0)) with fill-mode:
+    // forwards, which keeps applying after the animation completes. Any
+    // non-"none" transform creates a new containing block for descendant
+    // position:fixed elements, which trapped the mobile full-screen player
+    // inside its ancestor's box instead of the viewport. Dropping the
+    // animation once it's done removes that lingering transform.
+    document.querySelectorAll('.m3-card, .queue-panel, .stagger-item').forEach(el => {
+      el.addEventListener('animationend', () => {
+        // Dropping the animation reverts opacity to each rule's own base
+        // value (0 for .queue-panel/.stagger-item) unless we pin it back to
+        // the settled state ourselves -- only the transform should go away.
+        el.style.opacity = '1';
+        el.style.transform = 'none';
+        el.style.animation = 'none';
+      }, { once: true });
+    });
+
+    const radioAudio = document.getElementById('radio-audio');
+    const queuePanel = document.getElementById('queue-panel');
+    const cardBroadcast = document.querySelector('.card-broadcast');
+
+    const savedVolume = parseInt(localStorage.getItem('radioVolume') || '80', 10);
+    radioAudio.volume = savedVolume / 100;
+
+    const volumeIconMuted = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.8L18.73 21 20 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"></path>';
+    const volumeIconNormal = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path>';
+    const playerVolumeIcon = document.getElementById('player-volume-icon');
+    function refreshVolumeIcon(value) {
+      playerVolumeIcon.innerHTML = value == 0 ? volumeIconMuted : volumeIconNormal;
+    }
+    refreshVolumeIcon(savedVolume);
+
+    const STREAM_URLS = { mp3: '/radio/stream', flac: '/radio/stream.flac' };
+    // Plain /radio/stream(.flac) is a raw chunked live feed -- no
+    // Content-Length or byte ranges, so browsers can't seek it at all.
+    // /radio/hls(-flac)/live.m3u8 is a short rolling-window HLS mirror of
+    // the same feed (Liquidsoap writes immutable ~6s segments), which gives
+    // real seekable ranges, one mirror per quality tier.
+    const HLS_URLS = { mp3: '/radio/hls/live.m3u8', flac: '/radio/hls-flac/live.m3u8' };
+    // audio.canPlayType('application/vnd.apple.mpegurl') is supposed to be
+    // how you feature-detect native HLS support, but Chromium returns
+    // "maybe" for it too despite having zero actual ability to play an
+    // m3u8 -- pointing <audio src> straight at a playlist file there just
+    // hangs forever on "loading". Real native HLS is a Safari-only thing in
+    // practice, so gate it on that instead of trusting canPlayType alone.
+    const isRealSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+    let radioQuality = localStorage.getItem('radioQuality') || 'mp3';
+    if (!STREAM_URLS[radioQuality]) radioQuality = 'mp3';
+    let hlsInstance = null;
+    let seekControlsAvailable = false;
+
+    function applyQuality(q) {
+      radioQuality = q;
+      localStorage.setItem('radioQuality', q);
+      document.querySelectorAll('.quality-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.quality === q);
+      });
+    }
+    applyQuality(radioQuality);
+
+    const snackbar = document.getElementById('snackbar');
+    let snackbarTimer = null;
+    function showSnackbar(message) {
+      snackbar.querySelector('span').textContent = message;
+      snackbar.classList.add('visible');
+      clearTimeout(snackbarTimer);
+      snackbarTimer = setTimeout(() => snackbar.classList.remove('visible'), 4000);
+    }
+
+    function updateSeekControlsUI() {
+      playerRewindBtn.disabled = !seekControlsAvailable;
+      playerLiveBtn.disabled = !seekControlsAvailable;
+    }
+
+    function destroyHls() {
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
+      }
+    }
+
+    // Guards against a stale HLS attempt's error/timeout callback acting
+    // after a newer attempt (or an explicit fallback) has already taken
+    // over -- without this, a slow-to-fail first attempt could stomp on a
+    // perfectly fine second one.
+    let playbackAttemptId = 0;
+    const HLS_LOAD_TIMEOUT = 8000;
+
+    function fallbackToPlainStream(reason) {
+      console.warn('HLS playback unavailable, falling back to plain stream:', reason);
+      playbackAttemptId++;
+      destroyHls();
+      seekControlsAvailable = false;
+      updateSeekControlsUI();
+      radioAudio.src = STREAM_URLS[radioQuality];
+      radioAudio.play().catch(() => scheduleReconnect('fallback play failed'));
+    }
+
+    // Starts playback for the currently selected quality, preferring the
+    // HLS mirror (real seek support) when it's usable, falling back to the
+    // plain live stream otherwise (a browser with neither hls.js's
+    // MSE-based playback nor native HLS support, or if the HLS
+    // manifest/segments fail or time out for any reason -- a listener
+    // should never be left with no audio just because the DVR mirror had a
+    // hiccup).
+    function startPlayback() {
+      destroyHls();
+      const attemptId = ++playbackAttemptId;
+      // MP3 tier's HLS mirror is AAC-in-MPEG-TS (see radio.liq) -- unlike
+      // raw MP3, AAC packets in a TS container don't share a bit reservoir
+      // across frame boundaries, so each segment decodes standalone and
+      // splices cleanly. FLAC tier's mirror is raw FLAC segments -- hls.js
+      // can't parse those at all (fragParsingError, every time), and real
+      // Safari's native HLS doesn't error out cleanly on them either, it
+      // just loops fetching segments forever without ever actually playing
+      // (confirmed against a real iPhone in the access log: continuous
+      // segment requests, stuck on "loading" client-side the whole time).
+      // So FLAC never attempts HLS at all now, MP3 only -- straight to the
+      // plain (Ogg-wrapped) FLAC stream, which is reliable on its own.
+      const hlsUrl = HLS_URLS[radioQuality];
+      const canTryHlsJs = radioQuality === 'mp3' && window.Hls && Hls.isSupported();
+      if (canTryHlsJs) {
+        const hls = new Hls({ liveSyncDurationCount: 3, liveMaxLatencyDurationCount: 10 });
+        hlsInstance = hls;
+        let started = false;
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (attemptId !== playbackAttemptId) return;
+          started = true;
+          radioAudio.play().catch(() => scheduleReconnect('hls play failed'));
+        });
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (attemptId !== playbackAttemptId || !data.fatal) return;
+          fallbackToPlainStream(data.details);
+        });
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(radioAudio);
+        seekControlsAvailable = true;
+        setTimeout(() => {
+          if (attemptId === playbackAttemptId && !started) fallbackToPlainStream('manifest timeout');
+        }, HLS_LOAD_TIMEOUT);
+      } else if (radioQuality === 'mp3' && isRealSafari && radioAudio.canPlayType('application/vnd.apple.mpegurl')) {
+        radioAudio.src = hlsUrl;
+        radioAudio.play().catch(() => scheduleReconnect('native hls play failed'));
+        seekControlsAvailable = true;
+        const onNativeError = () => {
+          if (attemptId !== playbackAttemptId) return;
+          fallbackToPlainStream('native hls error');
+        };
+        radioAudio.addEventListener('error', onNativeError, { once: true });
+        setTimeout(() => {
+          if (attemptId === playbackAttemptId && radioAudio.readyState === 0) {
+            radioAudio.removeEventListener('error', onNativeError);
+            fallbackToPlainStream('native hls timeout');
+          }
+        }, HLS_LOAD_TIMEOUT);
+      } else {
+        radioAudio.src = STREAM_URLS[radioQuality];
+        radioAudio.play().catch(() => scheduleReconnect('plain stream play failed'));
+        seekControlsAvailable = false;
+      }
+      updateSeekControlsUI();
+    }
+
+    document.querySelectorAll('.quality-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const q = btn.dataset.quality;
+        if (q === radioQuality) return;
+        applyQuality(q);
+        if (q === 'flac') {
+          showSnackbar('FLAC расходует в 6-8 раз больше трафика, чем MP3');
+        }
+        if (!radioAudio.paused) {
+          startPlayback();
+        }
+      });
+    });
+
+    // Icon state is set immediately on click rather than waiting for the
+    // 'playing'/'pause' events -- 'playing' in particular only fires once
+    // buffering finishes, which can take a couple of seconds and made the
+    // button look unresponsive. The events (below) still run afterwards as
+    // a sync/confirmation pass, so external state changes (quality switch,
+    // media session actions) stay consistent too.
+    function setPlayingUI(isPlaying) {
+      playerPlayPauseIcon.innerHTML = isPlaying ? iconPauseBars : iconPlayTriangle;
+      playerPlayPauseBtn.title = isPlaying ? 'Пауза' : 'Играть';
+      playerStatus.textContent = isPlaying ? 'Играет' : 'Пауза';
+      updateMediaSessionPlaybackState();
+    }
+
+    // Whether the user actually wants audio playing right now, as opposed
+    // to radioAudio.paused, which also goes true for reasons that have
+    // nothing to do with user intent -- a dropped connection when the
+    // backend restarts, a stalled HLS segment fetch, etc. Backend restarts
+    // used to leave the player looking "stopped" with no way to recover
+    // short of manually clicking play again; now anything that interrupts
+    // playback while userWantsPlayback is still true just quietly retries
+    // instead of giving up.
+    let userWantsPlayback = false;
+    let reconnectTimer = null;
+    const RECONNECT_DELAY = 4000;
+
+    function clearReconnectTimer() {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    }
+
+    function scheduleReconnect(reason) {
+      if (!userWantsPlayback || reconnectTimer) return;
+      console.warn('Playback interrupted, reconnecting:', reason);
+      playerPlayPauseBtn.title = 'Переподключение...';
+      playerStatus.textContent = 'Переподключение...';
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        if (userWantsPlayback) startPlayback();
+      }, RECONNECT_DELAY);
+    }
+
+    function toggleRadio() {
+      if (radioAudio.paused) {
+        userWantsPlayback = true;
+        clearReconnectTimer();
+        startPlayback();
+        setPlayingUI(true);
+        playerPlayPauseBtn.title = 'Загрузка...';
+        playerStatus.textContent = 'Загрузка...';
+      } else {
+        userWantsPlayback = false;
+        clearReconnectTimer();
+        destroyHls();
+        seekControlsAvailable = false;
+        updateSeekControlsUI();
+        radioAudio.pause();
+        radioAudio.removeAttribute('src');
+        radioAudio.load();
+        setPlayingUI(false);
+      }
+    }
+    radioAudio.addEventListener('playing', () => {
+      setPlayingUI(true);
+      // Something already recovered (e.g. fallbackToPlainStream succeeded)
+      // before the scheduled retry fired -- cancel it, otherwise it would
+      // yank playback back to square one a few seconds into otherwise-fine
+      // audio.
+      clearReconnectTimer();
+    });
+    radioAudio.addEventListener('pause', () => {
+      // A pause that happens while the user still wants playback is
+      // incidental (e.g. hls.js tearing itself down mid-reconnect), not a
+      // real stop -- leave the "playing" look in place so it doesn't flash
+      // to "stopped" and back during a retry.
+      if (!userWantsPlayback) setPlayingUI(false);
+    });
+    radioAudio.addEventListener('waiting', () => {
+      playerPlayPauseBtn.title = 'Загрузка...';
+      playerStatus.textContent = 'Загрузка...';
+    });
+    radioAudio.addEventListener('error', () => scheduleReconnect('media element error'));
+
+    const npBlock = document.getElementById('now-playing');
+    const npCover = document.getElementById('np-cover');
+    const npTitle = document.getElementById('np-title');
+    const npArtist = document.getElementById('np-artist');
+    const npProgressFill = document.getElementById('np-progress-fill');
+    const npElapsedEl = document.getElementById('np-elapsed');
+    const npDurationEl = document.getElementById('np-duration');
+    let npLastUpdated = null;
+    let npDuration = null;
+    let npStartedAt = null;
+
+    // Anchor point: {currentTime of the <audio> element, true server-side
+    // elapsed} captured whenever we last had a trustworthy elapsed reading.
+    // Between anchors, progress ticks from audio.currentTime deltas instead
+    // of wall-clock time -- that's the browser's own decode/playback clock,
+    // so it advances in lockstep with what's actually audible and holds
+    // still during a rebuffer, instead of drifting off during buffering
+    // hiccups the way a Date.now()-based timer would.
+    let audioAnchorTime = null;
+    let elapsedAnchor = null;
+
+    function formatTime(secs) {
+      secs = Math.max(0, Math.floor(secs || 0));
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      return m + ':' + String(s).padStart(2, '0');
+    }
+
+    function serverElapsed() {
+      if (!npStartedAt) return 0;
+      return (Date.now() / 1000) - npStartedAt;
+    }
+
+    function reanchor() {
+      audioAnchorTime = radioAudio.currentTime;
+      elapsedAnchor = serverElapsed();
+    }
+
+    function tickProgress() {
+      if (!npDuration) return;
+      let elapsed;
+      const audioIsLive = !radioAudio.paused && !radioAudio.ended && audioAnchorTime !== null;
+      if (audioIsLive) {
+        elapsed = elapsedAnchor + (radioAudio.currentTime - audioAnchorTime);
+      } else {
+        elapsed = serverElapsed();
+      }
+      elapsed = Math.max(0, Math.min(npDuration, elapsed));
+      const pct = Math.min(100, (elapsed / npDuration) * 100) + '%';
+      npProgressFill.style.width = pct;
+      npElapsedEl.textContent = formatTime(elapsed);
+      playerProgressFill.style.width = pct;
+      playerElapsedEl.textContent = formatTime(elapsed);
+      updateMediaSessionPosition(elapsed);
+    }
+
+    // Expanded player (always visible on desktop; tap-to-expand on mobile)
+    const playerCover = document.getElementById('player-cover');
+    const playerTitle = document.getElementById('player-title');
+    const playerArtist = document.getElementById('player-artist');
+    const playerProgressFill = document.getElementById('player-progress-fill');
+    const playerElapsedEl = document.getElementById('player-elapsed');
+    const playerDurationEl = document.getElementById('player-duration');
+    const playerPlayPauseBtn = document.getElementById('player-playpause');
+    const playerStatus = document.getElementById('player-status');
+    const playerPlayPauseIcon = document.getElementById('player-playpause-icon');
+    const playerCopyBtn = document.getElementById('player-copy-link');
+    const playerRewindBtn = document.getElementById('player-rewind');
+    const playerLiveBtn = document.getElementById('player-live');
+    const iconPlayTriangle = '<path d="M8 5v14l11-7z"></path>';
+    const iconPauseBars = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"></path>';
+    let npLink = null;
+
+    // Mobile only in practice -- desktop CSS forces .player-inline visible
+    // and hides #now-playing/.player-inline-header, so these handlers are
+    // simply inert there (nothing calls them, and even if something did,
+    // the CSS override means toggling .expanded has no visible effect).
+    const playerInline = document.getElementById('player-inline');
+    const playerCollapseBtn = document.getElementById('player-collapse');
+
+    // Expanded state is full-screen on mobile (see CSS), so the page behind
+    // it shouldn't scroll while it's open -- otherwise a scroll gesture
+    // meant for the player list/controls can yank the whole page around
+    // underneath once you hit the top/bottom of the overlay's own content.
+    let scrollLockY = 0;
+    function lockBackgroundScroll() {
+      // Locking removes the page's own scrollbar, which on a
+      // non-overlay-scrollbar browser widens the viewport by the
+      // scrollbar's width -- centered content (the whole .layout, side
+      // links included) shifts sideways by that amount. Padding the body
+      // back out by the same width keeps its visible content area (and
+      // therefore anything centered inside it) exactly where it was.
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      scrollLockY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = -scrollLockY + 'px';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + 'px';
+    }
+    function unlockBackgroundScroll() {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.paddingRight = '';
+      window.scrollTo(0, scrollLockY);
+    }
+
+    const playerCoverWrap = document.querySelector('.player-cover-wrap');
+    const MOBILE_QUERY = '(max-width: 860px)';
+
+    // No scrolling in the mobile full-screen player -- everything needs to
+    // fit in one screen instead. Every row but the cover renders at its own
+    // natural height (see CSS above), so this measures how much vertical
+    // space those rows actually take and gives the cover exactly what's
+    // left over, capped to the available width so it stays square without
+    // overflowing sideways either.
+    function fitMobilePlayerCover() {
+      if (!window.matchMedia(MOBILE_QUERY).matches) return;
+      if (!playerInline.classList.contains('expanded')) return;
+      const style = getComputedStyle(playerInline);
+      const availableHeight = playerInline.clientHeight
+        - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+      let otherHeight = 0;
+      Array.from(playerInline.children).forEach((child) => {
+        if (child === playerCoverWrap) return;
+        const childStyle = getComputedStyle(child);
+        if (childStyle.display === 'none') return;
+        otherHeight += child.getBoundingClientRect().height
+          + parseFloat(childStyle.marginTop) + parseFloat(childStyle.marginBottom);
+      });
+      const availableWidth = playerInline.clientWidth
+        - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const size = Math.max(120, Math.min(availableHeight - otherHeight, availableWidth));
+      playerCoverWrap.style.maxWidth = size + 'px';
+    }
+    window.addEventListener('resize', fitMobilePlayerCover);
+
+    function expandPlayer() {
+      playerInline.classList.remove('closing');
+      playerInline.classList.add('expanded');
+      npBlock.setAttribute('aria-expanded', 'true');
+      if (window.matchMedia(MOBILE_QUERY).matches) {
+        lockBackgroundScroll();
+        // One frame late: the cover still has its old size (or none) until
+        // the browser lays the just-added .expanded content out, so the
+        // "other rows" measurement above would be wrong if taken now.
+        requestAnimationFrame(fitMobilePlayerCover);
+      }
+    }
+    function collapsePlayer() {
+      const isMobile = window.matchMedia('(max-width: 860px)').matches;
+      npBlock.setAttribute('aria-expanded', 'false');
+      unlockBackgroundScroll();
+      playerInline.classList.remove('expanded');
+      if (isMobile) {
+        // Swap straight to .closing so the fixed full-screen box (and its
+        // opacity/transform transition) stays in place while it fades out,
+        // instead of snapping back into normal flow instantly.
+        playerInline.classList.add('closing');
+        setTimeout(() => playerInline.classList.remove('closing'), 260);
+      }
+    }
+    npBlock.addEventListener('click', () => {
+      if (playerInline.classList.contains('expanded')) collapsePlayer();
+      else expandPlayer();
+    });
+    npBlock.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (playerInline.classList.contains('expanded')) collapsePlayer();
+        else expandPlayer();
+      }
+    });
+    playerCollapseBtn.addEventListener('click', collapsePlayer);
+
+    playerCopyBtn.addEventListener('click', async () => {
+      if (!npLink) return;
+      try {
+        await navigator.clipboard.writeText(npLink);
+        showSnackbar('Ссылка на трек скопирована');
+      } catch (e) {
+        showSnackbar('Не удалось скопировать ссылку');
+      }
+    });
+
+    playerPlayPauseBtn.addEventListener('click', toggleRadio);
+
+    playerRewindBtn.addEventListener('click', doRewind);
+    playerLiveBtn.addEventListener('click', doGoLive);
+    updateSeekControlsUI();
+
+    const playerVolumeBtn = document.getElementById('player-volume-btn');
+    const playerVolumePopup = document.getElementById('player-volume-popup');
+    const playerVolumeSlider = document.getElementById('player-volume-slider');
+    playerVolumeSlider.value = savedVolume;
+
+    playerVolumeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      playerVolumePopup.classList.toggle('visible');
+    });
+    document.addEventListener('click', (e) => {
+      if (!playerVolumePopup.classList.contains('visible')) return;
+      if (e.target === playerVolumeBtn || playerVolumeBtn.contains(e.target)) return;
+      if (e.target === playerVolumePopup || playerVolumePopup.contains(e.target)) return;
+      playerVolumePopup.classList.remove('visible');
+    });
+    playerVolumeSlider.addEventListener('input', () => {
+      radioAudio.volume = playerVolumeSlider.value / 100;
+      localStorage.setItem('radioVolume', playerVolumeSlider.value);
+      refreshVolumeIcon(playerVolumeSlider.value);
+    });
+
+    // Media Session: shows cover, track info and transport controls in the
+    // OS-level media notification -- lock screen and notification shade on
+    // any mobile platform (Android Chrome, iOS Safari 15+), plus the small
+    // media popup on desktop Chrome.
+    function updateMediaSessionMetadata() {
+      if (!('mediaSession' in navigator)) return;
+      // No "type" hint -- the actual bytes behind this URL can be a PNG
+      // even though the path ends in .jpg (Discogs-fetched covers save
+      // whatever format Discogs served), so a hardcoded "image/jpeg" hint
+      // was lying to the OS about the real content type. Leaving it out
+      // lets the browser sniff the real type from the response instead of
+      // rejecting a mismatched one.
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: playerTitle.textContent || 'MusicmaniA Radio',
+        artist: playerArtist.textContent || 'MusicmaniA',
+        album: 'MusicmaniA Radio',
+        artwork: [
+          { src: playerCover.src || '/avatar.jpg' }
+        ]
+      });
+    }
+    function updateMediaSessionPlaybackState() {
+      if (!('mediaSession' in navigator)) return;
+      navigator.mediaSession.playbackState = radioAudio.paused ? 'paused' : 'playing';
+    }
+    // Without an explicit position/duration, the OS notification shows just
+    // play/pause with no progress bar or elapsed/remaining time -- this is
+    // what actually turns on the richer transport UI (scrubber, time
+    // labels) on both Android and iOS, not just registering action
+    // handlers.
+    function updateMediaSessionPosition(elapsed) {
+      if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
+      if (!npDuration) return;
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: npDuration,
+          playbackRate: 1,
+          position: Math.max(0, Math.min(npDuration, elapsed || 0)),
+        });
+      } catch (e) {
+        // Throws if position > duration due to a stale reading mid-update;
+        // the next tick corrects itself, so just skip this one.
+      }
+    }
+    function trySetActionHandler(action, handler) {
+      // Each action registered separately -- if one action type isn't
+      // recognized by this browser and throws, it must not stop the rest
+      // from registering (a single shared try/catch around all of them
+      // meant one bad call could silently take out every action after it).
+      try {
+        navigator.mediaSession.setActionHandler(action, handler);
+      } catch (e) {
+        // Unsupported action type in this browser -- skip it.
+      }
+    }
+    if ('mediaSession' in navigator) {
+      const doPlay = () => { if (radioAudio.paused) toggleRadio(); };
+      const doPause = () => { if (!radioAudio.paused) toggleRadio(); };
+      trySetActionHandler('play', doPlay);
+      trySetActionHandler('pause', doPause);
+      // No 'stop' handler: it's functionally identical to pause for a live
+      // stream, and Android's collapsed notification only has room for
+      // ~3 action icons -- an extra one just to duplicate pause pushed out
+      // a genuinely useful button.
+      //
+      // previoustrack/nexttrack, not just seekbackward/seekforward:
+      // Chromium's Android notification only promotes seekbackward/
+      // seekforward into the always-visible compact view on some versions
+      // -- on others they're expanded-view-only, which is why only pause
+      // was showing. previoustrack/nexttrack are the ones Android reliably
+      // puts in the compact row, so both pairs are wired to the same
+      // rewind/go-live actions for the best chance of showing up
+      // everywhere.
+      trySetActionHandler('previoustrack', doRewind);
+      trySetActionHandler('nexttrack', doGoLive);
+      trySetActionHandler('seekbackward', doRewind);
+      trySetActionHandler('seekforward', doGoLive);
+    }
+
+    // A manual seek moves playback away from the live edge, so the progress
+    // bar's anchor needs adjusting by the same amount -- otherwise the next
+    // 'playing' event (which fires again once playback resumes after the
+    // seek) would recalibrate it straight back to the server's live position
+    // and undo the rewind visually. suppressAutoReanchor tells that handler
+    // to skip its recalibration for exactly one such resume.
+    let suppressAutoReanchor = false;
+
+    function doRewind() {
+      if (!seekControlsAvailable) return;
+      const delta = Math.min(10, radioAudio.currentTime);
+      suppressAutoReanchor = true;
+      radioAudio.currentTime = Math.max(0, radioAudio.currentTime - 10);
+      elapsedAnchor = Math.max(0, elapsedAnchor - delta);
+      audioAnchorTime = radioAudio.currentTime;
+      tickProgress();
+    }
+
+    function doGoLive() {
+      if (!seekControlsAvailable) return;
+      let target = null;
+      if (hlsInstance && hlsInstance.liveSyncPosition != null) {
+        target = hlsInstance.liveSyncPosition;
+      } else if (radioAudio.buffered.length) {
+        target = radioAudio.buffered.end(radioAudio.buffered.length - 1);
+      }
+      if (target == null) return;
+      suppressAutoReanchor = true;
+      radioAudio.currentTime = target;
+      elapsedAnchor = serverElapsed();
+      audioAnchorTime = target;
+      tickProgress();
+    }
+
+    radioAudio.addEventListener('playing', () => {
+      if (suppressAutoReanchor) {
+        suppressAutoReanchor = false;
+      } else {
+        reanchor();
+      }
+    });
+
+    async function fetchNowPlaying() {
+      try {
+        const response = await fetch('/radio/nowplaying.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP error ' + response.status);
+        const data = await response.json();
+        if (data.updated === npLastUpdated) {
+          // Same track: keep progress bar in sync with server without re-fading UI
+          npDuration = data.duration || null;
+          npStartedAt = data.started_at || null;
+          tickProgress();
+          return;
+        }
+        npLastUpdated = data.updated;
+        npDuration = data.duration || null;
+        npStartedAt = data.started_at || null;
+        if (!radioAudio.paused) {
+          reanchor();
+        }
+
+        npBlock.classList.add('np-fading');
+        cardBroadcast.classList.add('player-fading');
+        setTimeout(() => {
+          npTitle.textContent = data.title || 'Неизвестный трек';
+          npArtist.textContent = data.artist || 'MusicmaniA';
+          npCover.src = data.cover || '/avatar.jpg';
+          npDurationEl.textContent = npDuration ? formatTime(npDuration) : '--:--';
+          npElapsedEl.textContent = '0:00';
+          npProgressFill.style.width = '0%';
+          playerTitle.textContent = npTitle.textContent;
+          playerArtist.textContent = npArtist.textContent;
+          playerCover.src = npCover.src;
+          playerDurationEl.textContent = npDurationEl.textContent;
+          playerElapsedEl.textContent = '0:00';
+          playerProgressFill.style.width = '0%';
+          npLink = data.link || null;
+          playerCopyBtn.disabled = !npLink;
+          updateMediaSessionMetadata();
+          npBlock.classList.add('visible');
+          npBlock.classList.remove('np-fading');
+          cardBroadcast.classList.remove('player-fading');
+          tickProgress();
+          // Title/artist text can wrap differently for a new track, which
+          // changes how much height the non-cover rows take up.
+          fitMobilePlayerCover();
+        }, 220);
+      } catch (e) {
+        console.error('Ошибка получения текущего трека:', e);
+      }
+    }
+
+    const queueList = document.getElementById('queue-list');
+    const playerNextWrap = document.getElementById('player-next');
+    const playerNextTrackEl = document.getElementById('player-next-track');
+    let queuePollTimer = null;
+    let queueLastUpdated = null;
+
+    function buildQueueItem(item, i) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.className = 'queue-item';
+      a.style.animationDelay = (i * 60) + 'ms';
+      if (item.link) { a.href = item.link; a.target = '_blank'; a.rel = 'noopener'; }
+      const num = document.createElement('div');
+      num.className = 'qi-num';
+      num.textContent = i + 1;
+      const text = document.createElement('div');
+      text.className = 'qi-text';
+      const title = document.createElement('div');
+      title.className = 'qi-title';
+      title.textContent = item.title || 'Неизвестный трек';
+      const artist = document.createElement('div');
+      artist.className = 'qi-artist';
+      artist.textContent = item.artist || '';
+      text.appendChild(title);
+      text.appendChild(artist);
+      a.appendChild(num);
+      a.appendChild(text);
+      li.appendChild(a);
+      return li;
+    }
+
+    async function fetchQueue() {
+      try {
+        const response = await fetch('/radio/queue.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP error ' + response.status);
+        const data = await response.json();
+        if (data.updated === queueLastUpdated) return;
+        queueLastUpdated = data.updated;
+        const items = data.queue || [];
+        if (!items.length) {
+          queuePanel.classList.remove('visible');
+          playerNextWrap.classList.remove('visible');
+          fitMobilePlayerCover();
+          return;
+        }
+        queueList.innerHTML = '';
+        items.forEach((item, i) => queueList.appendChild(buildQueueItem(item, i)));
+        queuePanel.classList.add('visible');
+        const next = items[0];
+        const nextTitle = next.title || 'Неизвестный трек';
+        playerNextTrackEl.textContent = next.artist ? `${nextTitle} — ${next.artist}` : nextTitle;
+        playerNextWrap.classList.add('visible');
+        // The "next up" row toggling on/off changes how much height the
+        // non-cover rows take up, same as a title-wrap change above.
+        fitMobilePlayerCover();
+      } catch (e) {
+        console.error('Ошибка получения очереди:', e);
+      }
+    }
+
+    // Now playing and queue are always shown, independent of playback state
+    fetchNowPlaying();
+    setInterval(fetchNowPlaying, 5000);
+    fetchQueue();
+    setInterval(fetchQueue, 15000);
+    setInterval(tickProgress, 1000);
+
+    function stopRadioHard() {
+      try {
+        radioAudio.pause();
+        radioAudio.removeAttribute('src');
+        radioAudio.load();
+      } catch (e) {}
+    }
+    window.addEventListener('pagehide', stopRadioHard);
+    window.addEventListener('beforeunload', stopRadioHard);
+  </script>
+</body>
+</html>

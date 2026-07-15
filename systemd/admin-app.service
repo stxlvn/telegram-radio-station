@@ -1,0 +1,14 @@
+[Unit]
+Description=MusicmaniA Radio Admin Panel (queue editing)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/radio
+EnvironmentFile=-/etc/musicbestman/env
+ExecStart=/opt/radio/venv/bin/python /opt/radio/admin_app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

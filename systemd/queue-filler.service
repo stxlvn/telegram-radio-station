@@ -1,0 +1,15 @@
+[Unit]
+Description=MusicmaniA Radio Queue Filler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/radio
+EnvironmentFile=/etc/musicbestman/env
+ExecStart=/opt/radio/venv/bin/python /opt/radio/queue_filler.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
