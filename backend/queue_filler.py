@@ -183,16 +183,19 @@ def is_intro(*texts):
     return "intro" in combined
 
 
-AMBIENT_SKIP_PROB = 0.92  # ambient tracks aren't banned, just made much less common
-# Score-y instrumental cues rarely say "ambient" anywhere in their own tags,
-# but they do tend to share these words in their titles (soundtrack cue
-# naming conventions) and tend to run short. Neither signal alone is
-# reliable, so either one is enough to flag a candidate.
+# Background/score cues meant to sit under a film scene (tension-building,
+# atmospheric, no real song structure) rather than stand on their own --
+# excluded outright now, not just thinned out, per explicit request.
+# "soundtrack" is deliberately NOT one of these signals: plenty of real
+# songs (with vocals, normal structure) get released as soundtrack singles
+# too, and those should just play like any other track. Only the more
+# specific score/instrumental/cinematic-style signals actually mean "this
+# is background scoring, not a song".
 AMBIENT_KEYWORDS = ("ambient", "suite", "theme", "score", "cue", "underscore", "reprise")
 # The channel's own hashtag convention (e.g. "#disco #eurodisco #rnb #pop")
 # on the description post right before a batch of tracks -- a much more
 # precise signal than fuzzy keyword matching when it's there.
-AMBIENT_HASHTAGS = {"ambient", "soundtrack", "score", "instrumental", "cinematic"}
+AMBIENT_HASHTAGS = {"ambient", "score", "instrumental", "cinematic", "underscore"}
 SHORT_CUE_DURATION = 120  # seconds
 
 HASHTAG_RE = re.compile(r"#(\w+)")
@@ -273,8 +276,6 @@ DISCOGS_DURATION_TOLERANCE = 5  # seconds
 
 
 def try_discogs_track_lookup(artist, album_hint, duration, fallback_query=""):
-    if not discogs_token:
-        return None, None
     query_text = f"{artist} {album_hint}".strip() or fallback_query.strip()
     if not query_text or duration is None:
         return None, None
@@ -305,6 +306,46 @@ def try_discogs_track_lookup(artist, album_hint, duration, fallback_query=""):
             if abs(track_seconds - duration) <= DISCOGS_DURATION_TOLERANCE:
                 return found_artist, track_title
     return None, None
+
+
+# Discogs tags every release with genre/style fields, right there in the
+# search response -- no extra per-release fetch needed. Used as a tie-
+# breaker specifically for tracks that carry a soft "soundtrack"-ish local
+# signal but nothing strong enough on their own to exclude outright (see
+# looks_like_soundtrack_hint below): a real song happens to share a release
+# with score cues often enough that "soundtrack" alone isn't reliable, but
+# Discogs' own style tag on the matched release is a genuinely independent
+# signal.
+DISCOGS_AMBIENT_STYLES = {"ambient", "score", "soundtrack", "non-music", "field recording", "musique concrete"}
+
+
+def check_ambient_via_discogs(artist, title):
+    if not discogs_token or not artist or not title:
+        return None
+    query = urllib.parse.quote(f"{artist} {title}")
+    url = f"https://api.discogs.com/database/search?q={query}&type=release&per_page=3"
+    try:
+        data = _discogs_request(url)
+    except Exception as e:
+        print(f"discogs ambient check failed: {e}", file=sys.stderr)
+        return None
+    for result in (data.get("results") or [])[:3]:
+        tags = set()
+        for field in ("style", "genre"):
+            for v in result.get(field) or []:
+                tags.add(v.lower())
+        if tags & DISCOGS_AMBIENT_STYLES:
+            return True
+    return False
+
+
+SOUNDTRACK_HINT_RE = re.compile(r"\b(soundtrack|ost)\b", re.IGNORECASE)
+
+
+def looks_like_soundtrack_hint(*texts):
+    combined = " ".join(t for t in texts if t).lower()
+    hashtags = set(HASHTAG_RE.findall(combined))
+    return "soundtrack" in hashtags or bool(SOUNDTRACK_HINT_RE.search(combined))
 
 
 CAPTION_LOOKBACK = 5  # how many prior messages to check for a description post
@@ -416,8 +457,9 @@ async def fill_once(client, entity, ids, excluded, play_history):
         preceding_caption = ""
         if not looks_ambient(duration, file_title, file_name):
             preceding_caption = await get_preceding_caption(client, entity, candidate_id)
-        if looks_ambient(duration, file_title, file_name, preceding_caption) and random.random() < AMBIENT_SKIP_PROB:
-            # not banned outright, just thinned out -- leave it eligible for a future roll
+        if looks_ambient(duration, file_title, file_name, preceding_caption):
+            excluded.add(sid)
+            save_excluded(excluded)
             continue
 
         size = candidate.file.size if candidate.file else None
@@ -470,8 +512,20 @@ async def fill_once(client, entity, ids, excluded, play_history):
             excluded.add(sid)
             save_excluded(excluded)
             continue
-        if looks_ambient(duration, genre, artist, title, preceding_caption) and random.random() < AMBIENT_SKIP_PROB:
+        if looks_ambient(duration, genre, artist, title, preceding_caption):
             os.remove(path)
+            excluded.add(sid)
+            save_excluded(excluded)
+            continue
+        # No strong local signal either way, but something nearby smells
+        # like a soundtrack -- ask Discogs whether this specific release is
+        # actually tagged as score/ambient before letting it straight
+        # through, instead of trusting "soundtrack" alone (too many real
+        # songs share that tag) or excluding it outright (too many aren't).
+        if looks_like_soundtrack_hint(genre, preceding_caption) and check_ambient_via_discogs(artist, title):
+            os.remove(path)
+            excluded.add(sid)
+            save_excluded(excluded)
             continue
         meta = {
             "id": candidate_id,

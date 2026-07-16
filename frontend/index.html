@@ -43,13 +43,34 @@
       color: var(--md-sys-color-on-surface);
       min-height: 100vh;
       display: flex;
-      align-items: flex-start;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
       gap: 20px;
       padding: 24px;
       background-image: radial-gradient(ellipse at 15% 15%, rgba(255, 179, 172, 0.08) 0%, transparent 50%),
                         radial-gradient(ellipse at 85% 85%, rgba(255, 210, 122, 0.06) 0%, transparent 50%);
     }
+
+    .top-bar {
+      width: 100%;
+      max-width: 1400px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .admin-link {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--md-sys-color-on-surface-variant);
+      text-decoration: none;
+      flex-shrink: 0;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .admin-link svg { width: 18px; height: 18px; fill: currentColor; }
 
     .layout {
       display: flex;
@@ -58,10 +79,10 @@
       gap: 20px;
       width: 100%;
       max-width: 1400px;
-      margin: auto;
+      margin: 0 auto;
     }
 
-    @media (max-width: 860px) {
+    @media (max-width: 1024px) {
       .layout { flex-direction: column; align-items: center; }
     }
 
@@ -186,12 +207,22 @@
 
     /* Quality selector: M3 Expressive shape-morph button group -- full pill
        on the outer edges, near-square corner where the two segments meet. */
-    .quality-toggle {
-      display: flex;
-      gap: 4px;
+    /* One shared border/radius/clip around both rows -- letting each button
+       keep its own independent border (tried previously) left the active
+       quality button's solid fill sitting next to the video-link row's
+       plain transparent background with no shared edge tying them
+       together, which read as two separate pieces rather than one block
+       no matter how precisely the corner radii lined up. */
+    .stream-block {
       max-width: 320px;
       width: 100%;
       margin: 18px auto 0;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .quality-toggle {
+      display: flex;
     }
     .quality-btn {
       flex: 1;
@@ -201,7 +232,8 @@
       gap: 6px;
       background-color: transparent;
       color: var(--md-sys-color-on-surface-variant);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: none;
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
       padding: 10px 14px;
       font-size: 0.8rem;
       font-weight: 600;
@@ -209,12 +241,10 @@
       cursor: pointer;
       transition: 0.2s;
     }
-    .quality-btn:first-child { border-radius: 100px 10px 10px 100px; }
-    .quality-btn:last-child { border-radius: 10px 100px 100px 10px; }
+    .quality-btn:last-child { border-right: none; }
     .quality-btn.active {
       background-color: var(--md-sys-color-primary);
       color: var(--md-sys-color-on-primary);
-      border-color: transparent;
     }
     .quality-btn .quality-sub { opacity: 0.75; font-weight: 400; }
 
@@ -416,12 +446,19 @@
        place (accordion-style, not an overlay). Desktop overrides further
        down to always show it and drop the compact bar entirely. */
     .player-inline {
+      /* display:none, not max-height:0 -- a max-height:0 box still has
+         real margins that can collapse with adjacent siblings (#now-playing
+         has margin-bottom:14px), while the .expanded/.closing state is
+         position:fixed and fully out of flow. That mismatch meant
+         #now-playing's margin either did or didn't collapse into the
+         layout depending on which state .player-inline was in, showing up
+         as a real ~14px jump in whatever sits after it (measured directly)
+         right when .closing's timeout hands off back to this rule.
+         display:none matches "out of flow" in both states, so there's
+         nothing left to collapse differently. */
+      display: none;
       text-align: left;
-      max-height: 0;
-      opacity: 0;
-      overflow: hidden;
       pointer-events: none;
-      transition: max-height 0.35s ease, opacity 0.3s ease, margin 0.35s ease;
     }
     .player-inline.expanded {
       max-height: 900px;
@@ -434,7 +471,7 @@
     /* Mobile: expanding takes over the whole screen instead of just
        growing in place -- more room for the cover, easier to reach the
        controls one-handed than a panel wedged into the card's own width. */
-    @media (max-width: 860px) {
+    @media (max-width: 1024px) {
       /* .closing keeps the same fixed full-screen box as .expanded (so it
          stays visible in place) but is added right as .expanded is removed,
          letting opacity/transform actually transition -- position itself
@@ -443,6 +480,7 @@
          the transition finishes. */
       .player-inline.expanded,
       .player-inline.closing {
+        display: block;
         position: fixed;
         inset: 0;
         z-index: 300;
@@ -617,22 +655,55 @@
       white-space: nowrap;
     }
 
+    /* Same width/centering as .quality-toggle right above it, and no gap
+       between them, so the two read as one continuous card instead of two
+       separate floating pieces. */
+    .video-toggle-row {
+      display: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .video-toggle-row.visible { display: block; }
+    .video-toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      background-color: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    .video-toggle-btn svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+    /* Video replaces the cover visually and the mobile full-screen player
+       has no room to spare for both -- see fitMobilePlayerCover(), which
+       already measures every #player-inline child except the cover to
+       decide the cover's size; hiding the cover here just removes it from
+       that layout entirely instead of fighting it for space. */
+
     @media (max-width: 420px) {
       .player-cover-wrap { margin-bottom: 14px; }
       .player-controls-center { gap: 20px; }
     }
 
-    @media (max-width: 860px) {
+    @media (max-width: 1024px) {
       .queue-panel { max-width: 500px; }
     }
 
     /* Desktop: the player is always shown expanded inline in the card, no
        tap-to-expand -- hide the compact trigger bar and its collapse
        button, and force .player-inline visible regardless of .expanded. */
-    @media (min-width: 861px) {
+    @media (min-width: 1025px) {
       #now-playing { display: none !important; }
       .player-inline-header { display: none; }
       .player-inline {
+        display: block !important;
         max-height: none !important;
         opacity: 1 !important;
         pointer-events: auto !important;
@@ -677,10 +748,17 @@
       .player-icon-btn:hover { background-color: rgba(255, 255, 255, 0.08); }
       .player-ctrl-btn:hover { background-color: rgba(255, 255, 255, 0.08); }
       .player-play-btn:hover { transform: scale(1.05); }
+      .admin-link:hover { background-color: rgba(255, 255, 255, 0.08); color: var(--md-sys-color-primary); }
+      .video-toggle-btn:hover { background-color: rgba(255, 255, 255, 0.06); }
     }
   </style>
 </head>
 <body>
+  <div class="top-bar">
+    <a href="/admin/" id="admin-link" class="admin-link" title="Панель администратора" aria-label="Панель администратора">
+      <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v2H8a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a3 3 0 0 0-3-3zm0 2a1 1 0 0 1 1 1v2h-2V6a1 1 0 0 1 1-1zm0 8a2 2 0 0 1 1 3.73V18h-2v-1.27A2 2 0 0 1 12 13z"/></svg>
+    </a>
+  </div>
   <div class="layout">
   <div class="m3-card card-about">
     <div class="avatar-container stagger-item delay-1">
@@ -710,7 +788,7 @@
     </div>
 
     <div class="stagger-item delay-4">
-      <a href="https://t.me/your_channel" target="_blank" class="btn-telegram">
+      <a href="https://ttttt.me/oldmusicmania" target="_blank" class="btn-telegram">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 26 26" width="26" height="26">
           <circle cx="12" cy="12" r="12" fill="#24A1DE"></circle>
           <path fill="#ffffff" d="M5.939 12.066l10.998-4.25c.508-.188.956.115.779.894l-1.854 8.718c-.138.614-.492.763-.993.48l-2.746-2.023-1.325 1.274c-.146.146-.269.269-.551.269l.197-2.791 5.083-4.59c.221-.196-.049-.304-.344-.105l-6.282 3.951-2.706-.844c-.588-.184-.6-.589.122-.872z"></path>
@@ -777,9 +855,17 @@
             </div>
           </div>
         </div>
-        <div class="quality-toggle" id="quality-toggle">
-          <button type="button" class="quality-btn active" data-quality="mp3">MP3</button>
-          <button type="button" class="quality-btn" data-quality="flac">FLAC <span class="quality-sub">lossless</span></button>
+        <div class="stream-block">
+          <div class="quality-toggle" id="quality-toggle">
+            <button type="button" class="quality-btn active" data-quality="mp3">MP3</button>
+            <button type="button" class="quality-btn" data-quality="flac">FLAC <span class="quality-sub">lossless</span></button>
+          </div>
+          <div class="video-toggle-row" id="video-toggle-row">
+            <a href="#" id="video-link" class="video-toggle-btn" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
+              <span>Смотреть клип на YouTube</span>
+            </a>
+          </div>
         </div>
         <div class="player-next" id="player-next">
           <span class="player-next-label">Далее</span>
@@ -836,15 +922,28 @@
     // position:fixed elements, which trapped the mobile full-screen player
     // inside its ancestor's box instead of the viewport. Dropping the
     // animation once it's done removes that lingering transform.
+    function clearEntranceAnimation(el) {
+      // Dropping the animation reverts opacity to each rule's own base
+      // value (0 for .queue-panel/.stagger-item) unless we pin it back to
+      // the settled state ourselves -- only the transform should go away.
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+      el.style.animation = 'none';
+    }
     document.querySelectorAll('.m3-card, .queue-panel, .stagger-item').forEach(el => {
-      el.addEventListener('animationend', () => {
-        // Dropping the animation reverts opacity to each rule's own base
-        // value (0 for .queue-panel/.stagger-item) unless we pin it back to
-        // the settled state ourselves -- only the transform should go away.
-        el.style.opacity = '1';
-        el.style.transform = 'none';
-        el.style.animation = 'none';
-      }, { once: true });
+      // animationend is the normal path, but it depends on the animation
+      // actually firing and completing -- a backup timeout covers any
+      // browser/situation where that event doesn't fire for some reason
+      // (the animation is short, under 1s including stagger delay, so 1.5s
+      // is a safe margin past when it should already be done).
+      let cleared = false;
+      const clear = () => {
+        if (cleared) return;
+        cleared = true;
+        clearEntranceAnimation(el);
+      };
+      el.addEventListener('animationend', clear, { once: true });
+      setTimeout(clear, 1500);
     });
 
     const radioAudio = document.getElementById('radio-audio');
@@ -898,6 +997,42 @@
       clearTimeout(snackbarTimer);
       snackbarTimer = setTimeout(() => snackbar.classList.remove('visible'), 4000);
     }
+
+    // Plain target="_blank" still left the main page's fate tied to
+    // whatever the popup ended up doing on some mobile browsers -- if the
+    // native Basic Auth prompt was cancelled, the popup just showed
+    // nginx's bare "401 Authorization Required" page with no indication
+    // back on the main site that login didn't happen. Opening via
+    // window.open() instead gives us a handle to poll: if that 401 page
+    // shows up, close the popup ourselves and surface a real message here.
+    const adminLink = document.getElementById('admin-link');
+    adminLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const popup = window.open(adminLink.href, '_blank');
+      if (!popup) {
+        showSnackbar('Не удалось открыть панель — проверьте блокировку всплывающих окон');
+        return;
+      }
+      const deadline = Date.now() + 15000;
+      const poll = setInterval(() => {
+        if (popup.closed || Date.now() > deadline) {
+          clearInterval(poll);
+          return;
+        }
+        let bodyText = '';
+        try {
+          bodyText = (popup.document && popup.document.body && popup.document.body.innerText) || '';
+        } catch (err) {
+          // Cross-origin or not yet loaded -- try again next tick.
+          return;
+        }
+        if (bodyText.includes('Authorization Required')) {
+          popup.close();
+          clearInterval(poll);
+          showSnackbar('Вход не выполнен: логин или пароль не введены или указаны неверно');
+        }
+      }, 400);
+    });
 
     function updateSeekControlsUI() {
       playerRewindBtn.disabled = !seekControlsAvailable;
@@ -1175,33 +1310,22 @@
     // it shouldn't scroll while it's open -- otherwise a scroll gesture
     // meant for the player list/controls can yank the whole page around
     // underneath once you hit the top/bottom of the overlay's own content.
-    let scrollLockY = 0;
+    // position:fixed on body (tried previously, in two variations) changes
+    // body's own box -- its width, and what its centered children measure
+    // themselves against -- which is exactly why every attempt at this
+    // kept shifting content sideways by a few pixels no matter how the
+    // compensating math was tuned. overflow:hidden on the root element
+    // prevents scrolling without changing body's box at all, so there's
+    // nothing left for any child to shift against.
     function lockBackgroundScroll() {
-      // Locking removes the page's own scrollbar, which on a
-      // non-overlay-scrollbar browser widens the viewport by the
-      // scrollbar's width -- centered content (the whole .layout, side
-      // links included) shifts sideways by that amount. Padding the body
-      // back out by the same width keeps its visible content area (and
-      // therefore anything centered inside it) exactly where it was.
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      scrollLockY = window.scrollY;
-      document.body.style.position = 'fixed';
-      document.body.style.top = -scrollLockY + 'px';
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + 'px';
+      document.documentElement.style.overflow = 'hidden';
     }
     function unlockBackgroundScroll() {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.paddingRight = '';
-      window.scrollTo(0, scrollLockY);
+      document.documentElement.style.overflow = '';
     }
 
     const playerCoverWrap = document.querySelector('.player-cover-wrap');
-    const MOBILE_QUERY = '(max-width: 860px)';
+    const MOBILE_QUERY = '(max-width: 1024px)';
 
     // No scrolling in the mobile full-screen player -- everything needs to
     // fit in one screen instead. Every row but the cover renders at its own
@@ -1231,10 +1355,24 @@
     window.addEventListener('resize', fitMobilePlayerCover);
 
     function expandPlayer() {
-      playerInline.classList.remove('closing');
+      const isMobile = window.matchMedia(MOBILE_QUERY).matches;
+      if (isMobile) {
+        // .player-inline starts at display:none (see CSS) -- animating
+        // straight into .expanded from there doesn't work, a display
+        // change can't be transitioned and there's no previous frame to
+        // interpolate opacity/transform from, so the browser just snaps
+        // to the end state instantly. Priming with .closing first (same
+        // display:block + position:fixed as .expanded, but the pre-
+        // animation opacity:0/translateY state) and forcing a reflow
+        // before swapping to .expanded gives the transition an actual
+        // starting frame to animate from.
+        playerInline.classList.add('closing');
+        void playerInline.offsetHeight;
+        playerInline.classList.remove('closing');
+      }
       playerInline.classList.add('expanded');
       npBlock.setAttribute('aria-expanded', 'true');
-      if (window.matchMedia(MOBILE_QUERY).matches) {
+      if (isMobile) {
         lockBackgroundScroll();
         // One frame late: the cover still has its old size (or none) until
         // the browser lays the just-added .expanded content out, so the
@@ -1243,7 +1381,7 @@
       }
     }
     function collapsePlayer() {
-      const isMobile = window.matchMedia('(max-width: 860px)').matches;
+      const isMobile = window.matchMedia(MOBILE_QUERY).matches;
       npBlock.setAttribute('aria-expanded', 'false');
       unlockBackgroundScroll();
       playerInline.classList.remove('expanded');
@@ -1267,6 +1405,68 @@
       }
     });
     playerCollapseBtn.addEventListener('click', collapsePlayer);
+
+    // Music video link lookup: entirely client-side, browser-to-Google
+    // directly -- no embedding, no proxying, just a plain link out to the
+    // video's own watch page on youtube.com.
+    const YOUTUBE_API_KEY = 'AIzaSyAfEYPytHSAmfp1ePXcuto3LxbjOmXtonk';
+    const videoToggleRow = document.getElementById('video-toggle-row');
+    const videoLink = document.getElementById('video-link');
+    let videoCheckToken = 0;
+
+    // "official video" biases YouTube's own ranking toward an actual music
+    // video over "official audio" uploads (a still cover image with the
+    // track playing, technically a valid search hit but not what "смотреть
+    // клип" means). maxResults doesn't add to the quota cost -- search.list
+    // is a flat 100 units per call regardless -- so asking for several and
+    // filtering title text for audio-only tells ("audio", "lyric video",
+    // etc.) costs nothing extra over taking just the top hit blindly.
+    const AUDIO_ONLY_HINT_RE = /\b(audio|аудио|lyric|lyrics|lyric video|текст песни|static|cover art|provided to youtube)\b/i;
+    // Every track submitted through YouTube's music-distribution/Content ID
+    // pipeline automatically gets an auto-generated upload on a channel
+    // named "{Artist} - Topic" -- always a still image with the track
+    // playing, never an actual video. Channel name is a much more reliable
+    // signal for this than anything in the title text.
+    const TOPIC_CHANNEL_RE = /- Topic$/i;
+
+    async function searchYoutubeVideo(query) {
+      const url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q='
+        + encodeURIComponent(query + ' official video') + '&key=' + YOUTUBE_API_KEY;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('YouTube search HTTP ' + resp.status);
+      const data = await resp.json();
+      const items = (data.items || []).filter((item) => item.id && item.id.videoId);
+      if (!items.length) return null;
+      const preferred = items.find((item) => {
+        const title = (item.snippet && item.snippet.title) || '';
+        const channel = (item.snippet && item.snippet.channelTitle) || '';
+        return !AUDIO_ONLY_HINT_RE.test(title) && !TOPIC_CHANNEL_RE.test(channel);
+      });
+      return (preferred || items[0]).id.videoId;
+    }
+
+    function currentTrackQuery() {
+      return ((playerArtist.textContent || '') + ' ' + (playerTitle.textContent || '')).trim();
+    }
+
+    // Runs on every track change (see fetchNowPlaying) so the link only
+    // ever shows once a matching video is confirmed to exist.
+    async function refreshVideoAvailability() {
+      const query = currentTrackQuery();
+      const token = ++videoCheckToken;
+      videoToggleRow.classList.remove('visible');
+      if (!query) return;
+      try {
+        const videoId = await searchYoutubeVideo(query);
+        if (token !== videoCheckToken) return; // track changed again since this call started
+        if (videoId) {
+          videoLink.href = 'https://www.youtube.com/watch?v=' + videoId;
+          videoToggleRow.classList.add('visible');
+        }
+      } catch (e) {
+        console.error('YouTube availability check failed:', e);
+      }
+    }
 
     playerCopyBtn.addEventListener('click', async () => {
       if (!npLink) return;
@@ -1470,6 +1670,10 @@
           // Title/artist text can wrap differently for a new track, which
           // changes how much height the non-cover rows take up.
           fitMobilePlayerCover();
+          // Re-check clip availability for the new track -- also keeps an
+          // already-open video panel in sync instead of leaving the
+          // previous track's clip up.
+          refreshVideoAvailability();
         }, 220);
       } catch (e) {
         console.error('Ошибка получения текущего трека:', e);
