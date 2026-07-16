@@ -1,5 +1,7 @@
 # MusicmaniA Radio
 
+*[Русская версия](README.ru.md)*
+
 A 24/7 internet radio station built on top of a Telegram channel's music
 archive, with a synced re-broadcast into a Telegram video chat and a
 Material Design 3 web player.

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -39,11 +40,93 @@ def update_history_and_cleanup(current_path):
 
 
 discogs_token = os.environ.get("DISCOGS_TOKEN", "")
+youtube_api_key = os.environ.get("YOUTUBE_API_KEY", "")
+
+# Same filtering as the site used to do client-side, moved here so the
+# lookup happens once per track instead of once per listener's browser --
+# with search.list costing 100 quota units per call and tracks changing
+# every few minutes, doing this per-listener blew through the free daily
+# quota (10,000 units) within hours; per-track is the only way this fits
+# even loosely within budget.
+YOUTUBE_AUDIO_ONLY_HINT_RE = re.compile(
+    r"\b(audio|аудио|lyric|lyrics|lyric video|текст песни|static|cover art|provided to youtube)\b",
+    re.IGNORECASE,
+)
+YOUTUBE_TOPIC_CHANNEL_RE = re.compile(r"- Topic$", re.IGNORECASE)
+
+
+def _find_youtube_video_id_via_api(artist, title):
+    if not youtube_api_key:
+        return None
+    query = urllib.parse.quote(f"{artist} {title} official video")
+    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q={query}&key={youtube_api_key}"
+    try:
+        with urllib.request.urlopen(url, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        # Notably: search.list's free quota (10,000 units/day, 100 units per
+        # call) runs out partway through most days at this track-change
+        # rate -- every subsequent call fails with HTTP 429 until the
+        # quota resets, which is exactly what the yt-dlp fallback below is
+        # for.
+        print(f"youtube api search failed: {e}", file=sys.stderr)
+        return None
+    items = [item for item in (data.get("items") or []) if item.get("id", {}).get("videoId")]
+    for item in items:
+        snippet = item.get("snippet") or {}
+        video_title = snippet.get("title") or ""
+        channel = snippet.get("channelTitle") or ""
+        if not YOUTUBE_AUDIO_ONLY_HINT_RE.search(video_title) and not YOUTUBE_TOPIC_CHANNEL_RE.search(channel):
+            return item["id"]["videoId"]
+    return items[0]["id"]["videoId"] if items else None
+
+
+YTDLP_BIN = os.environ.get("YTDLP_BIN", "yt-dlp")
+
+
+def _find_youtube_video_id_via_ytdlp(artist, title):
+    query = f"ytsearch5:{artist} {title} official video"
+    try:
+        result = subprocess.run(
+            [YTDLP_BIN, query, "--flat-playlist", "--dump-json", "--no-warnings"],
+            capture_output=True, text=True, timeout=20,
+        )
+    except Exception as e:
+        print(f"yt-dlp search failed: {e}", file=sys.stderr)
+        return None
+    if result.returncode != 0:
+        print(f"yt-dlp search error: {result.stderr[:300]}", file=sys.stderr)
+        return None
+    items = []
+    for line in result.stdout.splitlines():
+        try:
+            item = json.loads(line)
+        except Exception:
+            continue
+        if item.get("id"):
+            items.append(item)
+    for item in items:
+        video_title = item.get("title") or ""
+        channel = item.get("channel") or item.get("uploader") or ""
+        if not YOUTUBE_AUDIO_ONLY_HINT_RE.search(video_title) and not YOUTUBE_TOPIC_CHANNEL_RE.search(channel):
+            return item["id"]
+    return items[0]["id"] if items else None
+
+
+def find_youtube_video_id(artist, title):
+    if not artist or not title:
+        return None
+    # Official API first (sanctioned, quota-limited); yt-dlp only as a
+    # fallback once that quota is exhausted for the day, not the primary
+    # path -- yt-dlp works by reverse-engineering YouTube's internal,
+    # unofficial endpoints rather than their public API, which is less
+    # stable and sits in more of a grey area against their terms, but it's
+    # still only ever used for search/metadata here, never to fetch or
+    # store the actual video/audio content itself.
+    return _find_youtube_video_id_via_api(artist, title) or _find_youtube_video_id_via_ytdlp(artist, title)
 
 
 def try_discogs_lookup(artist, title, fallback_query=""):
-    if not discogs_token:
-        return None
     query_text = f"{artist} {title}".strip() or fallback_query.strip()
     if not query_text:
         return None
@@ -198,6 +281,8 @@ def main():
         os.replace(tmp_cover, os.path.join(webroot, "cover.jpg"))
         cover_written = True
 
+    video_id = find_youtube_video_id(artist, title) if (artist and title) else None
+
     now = int(time.time())
     info = {
         "artist": artist or "",
@@ -205,6 +290,7 @@ def main():
         "cover": f"/radio/cover.jpg?t={now}" if cover_written else None,
         "link": f"https://t.me/{channel_username}/{track_id}" if track_id.isdigit() else None,
         "duration": round(duration) if duration else None,
+        "video_id": video_id,
         "started_at": now,
         "updated": now,
     }
