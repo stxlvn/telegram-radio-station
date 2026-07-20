@@ -98,7 +98,23 @@ def check_tgstream_audio_health():
     except Exception as e:
         log(f"tgstream audio health check failed: {e}")
         return
-    if "Error during demuxing" in r.stdout or "Input/output error" in r.stdout:
+    # "Error during demuxing: Immediate exit requested" is ffmpeg's own exit
+    # message when it's deliberately stopped (SIGTERM from any normal
+    # restart, ours or a prior run of this exact check) -- confirmed
+    # directly this false-positived on every single restart: the freshly
+    # restarted service's own last-90s window still contains the outgoing
+    # process's shutdown line, which this check then read as a live audio
+    # failure and used to trigger *another* restart, whose own shutdown
+    # line then re-triggered the next check 60s later -- a self-sustaining
+    # loop that never touched a genuine failure. A real silent-dropout
+    # error has some other reason after the colon (network reset, EOF,
+    # etc.), never this exact deliberate-stop phrase.
+    bad_lines = [
+        line for line in r.stdout.splitlines()
+        if ("Error during demuxing" in line or "Input/output error" in line)
+        and "Immediate exit requested" not in line
+    ]
+    if bad_lines:
         log("tgstream audio input hit a demuxing error -- restarting to recover")
         restart("tgstream.service")
 
