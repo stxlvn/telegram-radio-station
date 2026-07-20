@@ -1,5 +1,5 @@
 [Unit]
-Description=MusicmaniA Radio Watchdog (auto-restart on service/playback failure)
+Description=Radio Watchdog (auto-restart on service/playback failure)
 After=network.target icecast2.service radio.service tgstream.service
 
 [Service]

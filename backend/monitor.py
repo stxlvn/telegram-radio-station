@@ -80,6 +80,29 @@ def check_admin_app():
         restart("admin-app.service")
 
 
+def check_tgstream_audio_health():
+    # `systemctl is-active tgstream.service` in check_services() above
+    # stays "active" even when its ffmpeg has silently dropped the audio
+    # input -- the process and video branch keep running fine, so nothing
+    # else in this file ever notices (confirmed directly: happened twice,
+    # broadcast ran video-only for hours both times with no restart).
+    # ffmpeg now has -reconnect flags on that input (see stream.sh) so it
+    # should usually recover on its own; this is the safety net for when
+    # it doesn't -- if the exact demuxing-error signature shows up in the
+    # last couple of check cycles, force a restart.
+    try:
+        r = subprocess.run(
+            ["journalctl", "-u", "tgstream.service", "--since", "-90 seconds", "--no-pager"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception as e:
+        log(f"tgstream audio health check failed: {e}")
+        return
+    if "Error during demuxing" in r.stdout or "Input/output error" in r.stdout:
+        log("tgstream audio input hit a demuxing error -- restarting to recover")
+        restart("tgstream.service")
+
+
 def main():
     log(f"starting, checking every {CHECK_INTERVAL}s")
     while True:
@@ -88,6 +111,7 @@ def main():
             check_nowplaying_freshness()
             check_stream_reachable()
             check_admin_app()
+            check_tgstream_audio_health()
         except Exception as e:
             log(f"monitor loop error: {e}")
         time.sleep(CHECK_INTERVAL)

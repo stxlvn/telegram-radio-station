@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MusicmaniA</title>
+  <title>Your Radio</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,12 +78,30 @@
       justify-content: center;
       gap: 20px;
       width: 100%;
+      /* The two main cards (max-width 500px each) + gap + the queue panel
+         (380px) need ~1400px combined to all sit at their natural size.
+         The whole row (main cards + queue panel together) is centered as
+         one group -- no invisible counterweight spacer anymore, so the
+         group's own true center (not just the main cards') lands at the
+         page's true center. */
       max-width: 1400px;
       margin: 0 auto;
+    }
+    .main-cards {
+      display: flex;
+      align-items: stretch;
+      gap: 20px;
+      min-width: 0;
+      width: 100%;
     }
 
     @media (max-width: 1024px) {
       .layout { flex-direction: column; align-items: center; }
+      /* .main-cards is itself display:flex -- without this it kept the
+         desktop row direction even once .layout above it switched to a
+         column, so card-about and card-broadcast ended up side by side
+         (each clipped to half the viewport width) instead of stacked. */
+      .main-cards { flex-direction: column; align-items: center; }
     }
 
     @keyframes m3-card-enter {
@@ -98,6 +116,12 @@
 
     .m3-card {
       background-color: var(--md-sys-color-surface-container);
+      /* Card width/padding/radius reverted to their original values --
+         confirmed directly: widening the card while the cover stayed
+         close to its original size (see .player-cover-wrap) just left it
+         looking lost with more empty space around it, not proportionally
+         bigger. Type/button sizes inside keep their bump; those scale
+         fine within the original card width. */
       border-radius: 32px;
       padding: 40px 32px;
       max-width: 500px;
@@ -118,8 +142,15 @@
     .delay-3 { animation-delay: 150ms; }
     .delay-4 { animation-delay: 200ms; }
 
+    .card-about {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
     .avatar-container {
-      width: 112px; height: 112px; margin: 0 auto 24px; border-radius: 50%;
+      width: 148px; height: 148px; margin: 0 auto 24px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       transition: transform 0.4s var(--md-sys-motion-easing-emphasized);
     }
@@ -332,7 +363,8 @@
       width: 100%;
       margin: 12px auto 8px;
       text-align: left;
-      font-size: 0.72rem;
+      font-family: 'Product Sans', 'Roboto Flex', sans-serif;
+      font-size: 1.1rem;
       font-weight: 700;
       letter-spacing: 0.05em;
       text-transform: uppercase;
@@ -340,16 +372,43 @@
     }
     .on-air-label-first { margin-top: 0; }
 
+    .player-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      /* Tightened from 18px -- purely informational (listeners/bitrate/
+         quality), not worth the same breathing room as an interactive
+         row. */
+      margin: 0 0 8px;
+      font-size: 0.68rem;
+      color: var(--md-sys-color-on-surface-variant);
+      letter-spacing: 0.02em;
+    }
+    .player-meta-dot { opacity: 0.5; }
+    .player-meta-dot.hidden, .bitrate-info.hidden, .quality-info.hidden { display: none; }
+
+    .listeners-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .listeners-badge.visible { opacity: 1; }
+    .listeners-badge svg { width: 12px; height: 12px; fill: var(--md-sys-color-primary); flex-shrink: 0; }
+
     .now-playing {
       display: flex;
       align-items: center;
       gap: 12px;
       max-width: 320px;
       width: 100%;
-      margin: 0 auto 14px;
+      margin: 0 auto 10px;
       padding: 8px;
       border-radius: 16px;
-      background-color: rgba(255, 255, 255, 0.04);
       text-align: left;
       text-decoration: none;
       color: inherit;
@@ -359,9 +418,9 @@
       cursor: pointer;
       transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease, background-color 0.2s ease;
     }
-    .now-playing.visible { display: flex; opacity: 1; max-height: 96px; margin: 0 auto 14px; }
+    .now-playing.visible { display: flex; opacity: 1; max-height: 96px; margin: 0 auto 10px; }
     .now-playing img {
-      width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
+      width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex-shrink: 0;
       background-color: var(--md-sys-color-primary-container);
       transition: opacity 0.25s ease;
     }
@@ -372,6 +431,59 @@
     }
     .now-playing .np-title { font-size: 0.9rem; font-weight: 600; color: var(--md-sys-color-on-surface); }
     .now-playing .np-artist { font-size: 0.8rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 6px; }
+    /* Controls on the compact mini-player itself -- play/pause plus a
+       YouTube shortcut (mobile's only way to reach it now that the
+       expanded player's copy is desktop-only, see .video-toggle-row).
+       Tapping either must not also trigger the bar's own
+       expand-to-full-player click handler, so their click listeners stop
+       propagation. */
+    .np-playpause-btn,
+    .np-youtube-btn {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.08);
+      color: var(--md-sys-color-on-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    /* YouTube's own brand red instead of the neutral icon-button fill --
+       confirmed directly, an icon-only button blending into the same
+       muted grey as everything else around it read as unclear/easy to
+       miss. The color alone makes it instantly recognizable as "the
+       YouTube button" without needing a text label the compact bar
+       doesn't have room for. */
+    .np-youtube-btn {
+      background-color: #FF0000;
+      color: #fff;
+    }
+    .np-playpause-btn svg, .np-youtube-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+    /* Marquee: only kicks in when the title/artist text actually overflows
+       its container (measured in JS, see setMarqueeText) -- short text
+       just sits still, same as before. Bounces there-and-back rather than
+       looping/wrapping continuously, which reads calmer for a "now
+       playing" label that's on screen the whole time a track plays. */
+    .marquee-inner {
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .marquee-scrolling .marquee-inner {
+      animation-name: marquee-bounce;
+      animation-duration: var(--marquee-duration, 8s);
+      animation-timing-function: ease-in-out;
+      animation-iteration-count: infinite;
+    }
+    @keyframes marquee-bounce {
+      0%, 8% { transform: translateX(0); }
+      45%, 55% { transform: translateX(var(--marquee-distance, 0px)); }
+      92%, 100% { transform: translateX(0); }
+    }
     .np-fading img, .np-fading .np-title, .np-fading .np-artist,
     .np-fading .np-progress-track, .np-fading .np-time { opacity: 0; }
     .player-fading .player-cover-wrap, .player-fading .player-title, .player-fading .player-artist,
@@ -381,7 +493,7 @@
     }
 
     .np-progress-track {
-      width: 100%; height: 3px; border-radius: 2px;
+      width: 100%; height: 6px; border-radius: 3px;
       background-color: rgba(255, 255, 255, 0.12);
       overflow: hidden;
       transition: opacity 0.25s ease;
@@ -389,7 +501,7 @@
     .np-progress-fill {
       height: 100%; width: 0%;
       background-color: var(--md-sys-color-primary);
-      border-radius: 2px;
+      border-radius: 3px;
       transition: width 0.5s linear;
     }
     .np-time {
@@ -403,13 +515,25 @@
       background-color: transparent;
       border-radius: 32px;
       padding: 28px 20px;
-      max-width: 320px;
+      max-width: 380px;
       width: 100%;
+      flex-shrink: 1;
       opacity: 0;
       max-height: 0;
       overflow: hidden;
       transition: opacity 0.35s ease, max-height 0.35s ease, padding 0.35s ease;
       animation: m3-card-enter var(--md-sys-motion-duration-long2) var(--md-sys-motion-easing-emphasized-decelerate) forwards;
+      /* .layout's align-items:stretch already gives this box the same
+         height as .main-cards -- space-between keeps the description at
+         the top (where it belongs) while pushing .queue-list-wrap all the
+         way down to that stretched box's bottom edge, flush with the
+         player card's, with the leftover space landing as a gap between
+         them instead of dragging the description down too (confirmed
+         directly: justify-content:flex-end pulled the description down
+         with it, leaving blank space above it instead of below). */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .queue-panel.visible { opacity: 1; max-height: 4000px; }
     .queue-panel h2 {
@@ -418,13 +542,90 @@
       text-transform: uppercase; letter-spacing: 0.05em;
     }
     .queue-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    /* Desktop-only -- mobile reads the description via the cover-tap modal
+       instead (see .player-description-text), not duplicated here too.
+       Styled the same as .queue-panel itself (no card/backdrop of its
+       own) -- just stacked below it with matching spacing. */
+    .queue-description-panel {
+      margin-bottom: 28px;
+    }
+    .queue-description-text {
+      font-size: 0.92rem;
+      line-height: 1.55;
+      color: var(--md-sys-color-on-surface-variant);
+      white-space: pre-line;
+      height: 290px;
+      overflow-y: auto;
+      text-align: justify;
+      padding-right: 6px;
+      /* Fade edges toggled via JS (see updateDescriptionFade) based on
+         actual scroll position -- confirmed directly the earlier
+         background-gradient version (a shadow meant to show in the gaps
+         around text) was invisible on this near-black theme, since a dark
+         shadow over an already near-black background has no contrast to
+         read against. mask-image actually fades the visible text itself
+         to transparent, which works regardless of theme color. */
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+    .queue-description-text.fade-top {
+      -webkit-mask-image: linear-gradient(to bottom, transparent, black 28px);
+      mask-image: linear-gradient(to bottom, transparent, black 28px);
+    }
+    .queue-description-text.fade-bottom {
+      -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent);
+      mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent);
+    }
+    .queue-description-text.fade-top.fade-bottom {
+      -webkit-mask-image: linear-gradient(
+        to bottom, transparent, black 28px, black calc(100% - 28px), transparent
+      );
+      mask-image: linear-gradient(
+        to bottom, transparent, black 28px, black calc(100% - 28px), transparent
+      );
+    }
+    .queue-description-translate {
+      display: block;
+      margin-top: 10px;
+      padding: 0;
+      background: none;
+      border: none;
+      color: var(--md-sys-color-primary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    /* Mobile reads the description via the cover-tap modal instead (see
+       .player-description-text) -- showing it here too was a duplicate,
+       not a second place worth having it. */
+    @media (max-width: 1024px) {
+      .queue-description-panel { display: none; }
+      /* Mobile has its own YouTube button on the mini-player bar instead
+         (#np-youtube-btn) -- desktop keeps this row (still the only place
+         it shows YouTube), mobile doesn't need it twice. */
+      #video-toggle-row { display: none !important; }
+    }
     .queue-item {
       display: flex; align-items: center; gap: 10px;
       padding: 8px; border-radius: 14px;
       text-decoration: none; color: inherit;
-      transition: background-color 0.2s ease, opacity 0.35s ease, transform 0.35s ease;
-      animation: m3-stagger-enter 0.4s var(--md-sys-motion-easing-emphasized) forwards;
+      transition: background-color 0.2s ease;
     }
+    /* Queue-list updates are diffed and animated via FLIP (see
+       updateQueueList) instead of a full wipe-and-rebuild -- these classes
+       are applied/removed by JS, not used as plain CSS-only animations. */
+    li.qi-enter { opacity: 0; transform: translateY(-10px); }
+    li.qi-enter-active {
+      opacity: 1; transform: translateY(0);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    li.qi-move { transition: transform 0.35s ease; }
+    li.qi-exit {
+      overflow: hidden;
+      transition: height 0.3s ease, opacity 0.3s ease, margin-bottom 0.3s ease;
+    }
+    li.qi-exit-active { opacity: 0; margin-bottom: -8px; }
     .queue-item .qi-num {
       width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
       background-color: rgba(255, 255, 255, 0.08);
@@ -514,6 +715,61 @@
       .player-inline.closing .player-cover-wrap { margin-left: auto; margin-right: auto; width: 100%; }
     }
 
+    /* Short-and-wide phone screens (landscape) -- the portrait layout
+       above stacks the cover above everything else, which leaves almost
+       no room for any of it once height drops this low. Side-by-side
+       instead: cover on the left sized off the row's own height (via its
+       existing aspect-ratio:1/1, see .player-cover-wrap), everything else
+       in a scrollable column on the right. Keyed on max-height rather
+       than orientation so a landscape tablet -- plenty of height to
+       spare -- keeps the portrait layout instead. */
+    @media (max-width: 1024px) and (max-height: 500px) {
+      .player-inline.expanded,
+      .player-inline.closing {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        gap: 16px;
+        padding: 10px 16px;
+        overflow: hidden;
+      }
+      .player-inline-header {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        margin-bottom: 0;
+        z-index: 1;
+      }
+      .player-inline.expanded .player-cover-wrap,
+      .player-inline.closing .player-cover-wrap {
+        width: auto;
+        height: 100%;
+        max-width: none;
+        margin: 0;
+      }
+      .player-inline-body {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
+      }
+      /* Secondary rows dropped entirely -- not enough height on a phone
+         turned sideways to fit all of portrait's rows plus the cover
+         beside them; title/artist/progress/controls are what's actually
+         needed to use the player, everything else here was just eating
+         room the progress bar needed to stay visible without scrolling. */
+      #player-meta-row,
+      .stream-block,
+      #video-toggle-row,
+      #player-next {
+        display: none;
+      }
+    }
+
     .player-icon-btn {
       width: 46px; height: 46px; border-radius: 50%; border: none;
       background-color: transparent; color: var(--md-sys-color-on-surface-variant);
@@ -535,25 +791,200 @@
       */
       width: 100%; aspect-ratio: 1 / 1; flex-shrink: 0; border-radius: 20px; overflow: hidden;
       margin-bottom: 18px; background-color: var(--md-sys-color-primary-container);
+      cursor: pointer;
     }
     .player-cover-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
+    .player-description-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      background-color: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+    }
+    .player-description-backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+      visibility: visible;
+      transition: opacity 0.2s ease;
+    }
+    /* Full-screen image viewer now, not a card -- no description text
+       shown here anymore (that lives in the always-visible desktop
+       sidebar, see .queue-description-panel), so this is just the cover
+       at its real size, letterboxed rather than cropped. */
+    .player-description {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: none;
+      box-shadow: none;
+      border-radius: 0;
+      overflow: hidden;
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+    }
+    .player-description-backdrop.visible .player-description { transform: scale(1); }
+    @media (max-width: 1024px) {
+      /* Image + description text + actions can add up to more than the
+         viewport on a short phone screen -- the modal itself scrolls as a
+         whole rather than clipping anything (desktop never needs this,
+         it's just the fullscreen image with nothing else). */
+      .player-description { justify-content: flex-start; overflow-y: auto; }
+    }
+    /* Landscape phone -- cover on the left (sized off the row's height via
+       its own object-fit:contain), description text + save/search actions
+       stacked in a column on the right instead of everything piled
+       vertically, matching the same side-by-side treatment as the main
+       player layout at this breakpoint. */
+    @media (max-width: 1024px) and (max-height: 500px) {
+      .player-description {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        overflow: hidden;
+      }
+      .player-description-close {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        align-self: auto;
+      }
+      .player-description-cover {
+        height: 100%;
+        max-height: 100%;
+        width: auto;
+        flex-shrink: 0;
+      }
+      .player-description-side {
+        flex: 1;
+        min-width: 0;
+        max-width: 360px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 12px;
+      }
+      .player-description-text {
+        max-height: none;
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        max-width: none;
+      }
+      .player-description-actions { justify-content: flex-start; }
+    }
+    /* In normal flow (not position:absolute) and right-aligned via
+       align-self -- .player-description is a flex column, so this sits in
+       its own row above the cover instead of overlaid on top of it.
+       Confirmed directly: absolute positioning let a tall cover's own top
+       edge sit right underneath it, the two visually overlapping. */
+    .player-description-close {
+      flex-shrink: 0;
+      align-self: flex-end;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background-color: rgba(255, 255, 255, 0.12);
+      color: var(--md-sys-color-on-surface-variant);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .player-description-close svg { width: 16px; height: 16px; fill: currentColor; }
+    /* object-fit:contain (not cover) plus no fixed aspect-ratio -- the
+       cover's real proportions are preserved instead of being cropped to
+       a forced square, letterboxing within the viewport if it isn't one. */
+    .player-description-cover {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      /* Leaves room for the close button + gap now sitting above it in
+         flow (was 56px when the close button was position:absolute and
+         only the actions row below needed reserving). */
+      max-height: calc(100% - 96px);
+      object-fit: contain;
+      border-radius: 10px;
+      margin: 0;
+    }
+    /* Hidden on desktop -- the sidebar (.queue-description-panel) already
+       shows the description there. Mobile has no such sidebar, so this is
+       the only place it's readable on a phone; the cover shrinks to make
+       room for it instead of filling the whole modal. */
+    .player-description-text {
+      display: none;
+    }
+    @media (max-width: 1024px) {
+      .player-description-cover { max-height: 45vh; }
+      .player-description-text {
+        display: block;
+        width: 100%;
+        max-width: 420px;
+        max-height: 30vh;
+        overflow-y: auto;
+        font-size: 0.85rem;
+        line-height: 1.55;
+        color: var(--md-sys-color-on-surface-variant);
+        white-space: pre-line;
+        text-align: justify;
+        padding: 0 4px;
+      }
+    }
+    .player-description-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px 16px;
+      margin-top: 10px;
+    }
+    .player-description-action {
+      padding: 0;
+      background: none;
+      border: none;
+      color: var(--md-sys-color-primary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      font-family: inherit;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
     .player-title {
-      font-size: 1.2rem; font-weight: 700; color: var(--md-sys-color-on-surface);
-      margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 1.38rem; font-weight: 700; color: var(--md-sys-color-on-surface);
+      margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .player-artist {
-      font-size: 0.95rem; color: var(--md-sys-color-on-surface-variant);
-      margin-bottom: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 1.09rem; color: var(--md-sys-color-on-surface-variant);
+      margin-bottom: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
 
     .player-progress-track {
-      width: 100%; height: 4px; border-radius: 2px;
+      width: 100%; height: 7px; border-radius: 4px;
       background-color: rgba(255, 255, 255, 0.12); overflow: hidden;
     }
     .player-progress-fill {
       height: 100%; width: 0%; background-color: var(--md-sys-color-primary);
-      border-radius: 2px; transition: width 0.5s linear;
+      border-radius: 4px; transition: width 0.5s linear;
     }
     .player-time-row {
       display: flex; justify-content: space-between; font-size: 0.75rem;
@@ -572,19 +1003,19 @@
     .player-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
     .player-controls-center { display: flex; align-items: center; justify-content: center; gap: 28px; }
     .player-ctrl-btn {
-      width: 46px; height: 46px; border-radius: 50%; border: none; background-color: transparent;
+      width: 53px; height: 53px; border-radius: 50%; border: none; background-color: transparent;
       color: var(--md-sys-color-on-surface); display: flex; align-items: center; justify-content: center;
       cursor: pointer; transition: background-color 0.2s ease;
     }
-    .player-ctrl-btn svg { width: 26px; height: 26px; fill: currentColor; }
+    .player-ctrl-btn svg { width: 30px; height: 30px; fill: currentColor; }
     .player-ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
     .player-play-btn {
-      width: 64px; height: 64px; border-radius: 50%; border: none;
+      width: 74px; height: 74px; border-radius: 50%; border: none;
       background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
       display: flex; align-items: center; justify-content: center; cursor: pointer;
       transition: transform 0.2s ease;
     }
-    .player-play-btn svg { width: 28px; height: 28px; fill: currentColor; }
+    .player-play-btn svg { width: 32px; height: 32px; fill: currentColor; }
 
     .player-volume-wrap { position: relative; flex-shrink: 0; }
     .player-volume-popup {
@@ -630,6 +1061,7 @@
     }
 
     .player-next {
+      position: relative;
       display: none;
       align-items: center;
       gap: 8px;
@@ -637,6 +1069,7 @@
       padding-top: 14px;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
       font-size: 0.82rem;
+      cursor: pointer;
     }
     .player-next.visible { display: flex; }
     .player-next-label {
@@ -648,6 +1081,88 @@
       color: var(--md-sys-color-on-surface-variant);
       opacity: 0.7;
     }
+    .player-queue-toggle {
+      flex-shrink: 0;
+      margin-left: auto;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background-color: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.2s ease;
+    }
+    .player-queue-toggle svg { width: 18px; height: 18px; fill: currentColor; }
+    /* Base state points up (hinting "more content above"), expanded state
+       points back down toward the row that opened it -- inverted from the
+       usual dropdown convention on purpose, since this panel opens
+       upward instead of downward. */
+    .player-queue-toggle { transform: rotate(180deg); }
+    .player-queue-toggle[aria-expanded="true"] { transform: rotate(0deg); }
+    .player-queue-backdrop {
+      position: fixed;
+      inset: 0;
+      /* Below the panel itself (350) but above everything else -- an
+         invisible click-catcher, not a dimming overlay, since the panel is
+         a small anchored dropdown rather than a full modal card. */
+      z-index: 340;
+      background-color: transparent;
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      transition: visibility 0s linear 0.2s;
+    }
+    .player-queue-backdrop.visible {
+      pointer-events: auto;
+      visibility: visible;
+      transition: visibility 0s linear 0s;
+    }
+    .player-queue-panel {
+      position: fixed;
+      /* left/right/bottom set inline by JS (positionPlayerQueuePanel),
+         anchored to #player-queue-toggle's current on-screen position --
+         it's a body-level element now (see the HTML comment where it's
+         placed), so there's no positioned ancestor to anchor it via CSS
+         alone the way the previous position:absolute version did. */
+      /* Was max-height:280px + overflow-y:auto for a potentially longer
+         list -- the public queue display is now hard-capped to exactly 5
+         tracks (DISPLAY_QUEUE_SIZE in queue_list_writer.py), so there's
+         nothing left to scroll; the scroll container was just producing a
+         panel that looked like it wanted to scroll but had nowhere to go.
+         Sized to content instead. */
+      background-color: var(--md-sys-color-surface-container);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.45);
+      /* Higher than #player-inline's own z-index:300 -- as a body-level
+         sibling now, it needs to explicitly out-rank the full-screen
+         player overlay to actually appear on top of it, not underneath. */
+      z-index: 350;
+      /* opacity/transform/visibility, not display:none -- display can't be
+         transitioned (no previous frame to animate from), so toggling it
+         directly just snaps the panel in and out instantly. visibility is
+         delayed on the way out specifically so the panel stays out of the
+         way (unclickable, not screen-reader-focusable) only once the fade
+         has actually finished, not the instant the class comes off. */
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+    }
+    .player-queue-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      visibility: visible;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .player-queue-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
     .player-next-track {
       color: var(--md-sys-color-on-surface);
       overflow: hidden;
@@ -655,22 +1170,28 @@
       white-space: nowrap;
     }
 
-    /* Same width/centering as .quality-toggle right above it, and no gap
-       between them, so the two read as one continuous card instead of two
-       separate floating pieces. */
+    /* A separate card from .quality-toggle above it (its own margin/border,
+       not fused on) -- holds the YouTube clip link and, alongside it, the
+       Genius lyrics-search link. */
     .video-toggle-row {
       display: none;
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      max-width: 320px;
+      width: 100%;
+      margin: 10px auto 0;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
     }
-    .video-toggle-row.visible { display: block; }
+    .video-toggle-row.visible { display: flex; }
     .video-toggle-btn {
       display: flex;
+      flex: 1;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      width: 100%;
       padding: 12px;
       border: none;
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
       background-color: transparent;
       color: var(--md-sys-color-on-surface-variant);
       font-family: inherit;
@@ -680,6 +1201,7 @@
       cursor: pointer;
       transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     }
+    .video-toggle-btn:last-child { border-right: none; }
     .video-toggle-btn svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
     /* Video replaces the cover visually and the mobile full-screen player
        has no room to spare for both -- see fitMobilePlayerCover(), which
@@ -694,6 +1216,13 @@
 
     @media (max-width: 1024px) {
       .queue-panel { max-width: 500px; }
+      /* .side-links's 24px margin-top is sized for sitting below the much
+         taller #player-inline on desktop -- on mobile it sits right below
+         the much shorter compact #now-playing bar instead, where that much
+         space read as an oversized, lopsided gap. Scoped to this
+         breakpoint only so desktop spacing (where #now-playing is
+         display:none anyway) is untouched. */
+      .side-links { margin-top: 10px; }
     }
 
     /* Desktop: the player is always shown expanded inline in the card, no
@@ -710,8 +1239,61 @@
         margin-top: 14px;
       }
       .on-air-label { text-align: center; }
-      .player-cover-wrap { max-width: 220px; margin-left: auto; margin-right: auto; }
+      /* Split the difference -- 220px (full revert) left the cover looking
+         lost inside the now-wider (575px) card, but the full 255px bump
+         was confirmed to break the no-scroll fit on common laptop
+         viewports. 235px is a much smaller height add (~15px vs the
+         original ~35px) while still narrowing that visual gap. */
+      .player-cover-wrap { max-width: 235px; margin-left: auto; margin-right: auto; margin-bottom: 12px; }
+      .player-artist { margin-bottom: 10px; }
+      .player-time-row { margin-bottom: 14px; }
+      .player-controls { margin-bottom: 10px; }
       .player-status { display: block; }
+      /* Common laptop viewports (1366x768 and similar, minus browser
+         chrome) are shorter than this page's natural height at the
+         original desktop spacing -- the page needed to scroll, and the
+         admin button (fixed-positioned just past the player card's bottom
+         edge) landed below the fold and looked like it had disappeared.
+         Trimming padding/margins here (desktop only) gets everything back
+         within one screen without scrolling on those. */
+      body { padding-top: 14px; padding-bottom: 14px; }
+      /* On taller monitors the compacted card row is shorter than the
+         viewport, and flex-start left all that leftover space stacked at
+         the bottom only (empty gap there, none up top). "safe center"
+         splits it evenly above/below instead -- and unlike plain center,
+         it falls back to start alignment rather than clipping the top
+         off-screen if content ever *does* need more than the viewport
+         (falling back to the same no-scroll-lost-content behavior as
+         before on short windows). */
+      body { justify-content: safe center; }
+      .top-bar { display: contents; }
+      .m3-card { padding: 28px 32px; }
+      .queue-panel { padding: 18px 20px; }
+      /* Desktop only -- .main-cards is a row here (cardA + cardB side by
+         side), and each .m3-card's width:100% needs a *definite* width to
+         resolve that percentage against or it circularly falls back to a
+         too-small size (measured: both cards stuck at 434px instead of
+         500px). On mobile .main-cards switches to flex-direction:column
+         (single card per row, see the max-width:1024px block), where this
+         same fixed width would just force horizontal overflow instead --
+         confirmed directly, cards were spilling past the viewport edge. */
+      .main-cards {
+        flex-shrink: 0;
+        width: 1020px;
+        max-width: 1020px;
+      }
+      /* Position is computed in JS (see positionAdminLink) from the queue
+         panel's actual right edge and the player card's actual bottom
+         edge -- both shift with content/viewport width, so a fixed CSS
+         offset can't track them; this just opts the button into
+         fixed-position mode so JS can place it precisely. Desktop only:
+         on the mobile stacked layout "queue's right edge" and "player's
+         bottom edge" aren't a meaningful pair of anchors, so it stays in
+         its original top-bar spot there. */
+      .admin-link {
+        position: fixed;
+        z-index: 40;
+      }
       .player-next { display: none !important; }
     }
 
@@ -724,7 +1306,7 @@
       .btn-radio svg { width: 20px; height: 20px; }
       .btn-telegram { font-size: 0.8rem; padding: 8px 14px; }
       .quality-btn { font-size: 0.75rem; padding: 9px 10px; }
-      .side-links { font-size: 0.62rem; white-space: nowrap; }
+      .side-links { font-size: 0.62rem; }
       .side-links-dot { margin: 0 3px; }
       .now-playing { max-width: 100%; }
       .snackbar { width: calc(100% - 32px); font-size: 0.85rem; padding: 12px 14px; }
@@ -743,7 +1325,6 @@
       }
       .btn-radio:hover { background-color: #ab0a1e; }
       .side-links a:hover { color: var(--md-sys-color-primary); }
-      .now-playing:hover { background-color: rgba(255, 255, 255, 0.08); }
       .queue-item:hover { background-color: rgba(255, 255, 255, 0.06); }
       .player-icon-btn:hover { background-color: rgba(255, 255, 255, 0.08); }
       .player-ctrl-btn:hover { background-color: rgba(255, 255, 255, 0.08); }
@@ -756,15 +1337,16 @@
 <body>
   <div class="top-bar">
     <a href="/admin/" id="admin-link" class="admin-link" title="Панель администратора" aria-label="Панель администратора">
-      <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v2H8a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a3 3 0 0 0-3-3zm0 2a1 1 0 0 1 1 1v2h-2V6a1 1 0 0 1 1-1zm0 8a2 2 0 0 1 1 3.73V18h-2v-1.27A2 2 0 0 1 12 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M11 7l-1.41 1.41L12.17 11H2v2h10.17l-2.58 2.59L11 17l5-5zM20 3h-8v2h8v14h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
     </a>
   </div>
   <div class="layout">
+  <div class="main-cards">
   <div class="m3-card card-about">
     <div class="avatar-container stagger-item delay-1">
-      <img src="/avatar.jpg" alt="MusicmaniA">
+      <img src="/avatar.jpg" alt="Your Radio">
     </div>
-    <h1 class="stagger-item delay-2">MusicmaniA</h1>
+    <h1 class="stagger-item delay-2">Your Radio</h1>
     <div class="subtitle stagger-item delay-3">От ретро-хитов до свежих релизов</div>
 
     <div class="stats-badge stagger-item delay-3">
@@ -788,7 +1370,7 @@
     </div>
 
     <div class="stagger-item delay-4">
-      <a href="https://ttttt.me/oldmusicmania" target="_blank" class="btn-telegram">
+      <a href="https://t.me/yourchannel" target="_blank" class="btn-telegram">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 26 26" width="26" height="26">
           <circle cx="12" cy="12" r="12" fill="#24A1DE"></circle>
           <path fill="#ffffff" d="M5.939 12.066l10.998-4.25c.508-.188.956.115.779.894l-1.854 8.718c-.138.614-.492.763-.993.48l-2.746-2.023-1.325 1.274c-.146.146-.269.269-.551.269l.197-2.791 5.083-4.59c.221-.196-.049-.304-.344-.105l-6.282 3.951-2.706-.844c-.588-.184-.6-.589.122-.872z"></path>
@@ -812,6 +1394,16 @@
           <div class="np-progress-track"><div id="np-progress-fill" class="np-progress-fill"></div></div>
           <div class="np-time"><span id="np-elapsed">0:00</span> / <span id="np-duration">0:00</span></div>
         </div>
+        <!-- Mobile-only home for the YouTube link (see CSS/JS) -- desktop
+             never shows this bar at all, and keeps its own YouTube link in
+             the expanded player instead. Hidden until updateVideoLink
+             actually has a video_id for the current track. -->
+        <a href="#" id="np-youtube-btn" class="np-youtube-btn" target="_blank" rel="noopener noreferrer" title="Смотреть на YouTube" aria-label="Смотреть на YouTube" style="display: none;">
+          <svg viewBox="0 0 24 24"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
+        </a>
+        <button type="button" id="np-playpause-btn" class="np-playpause-btn" title="Играть" aria-label="Играть / пауза">
+          <svg viewBox="0 0 24 24" id="np-playpause-icon"><path d="M8 5v14l11-7z"></path></svg>
+        </button>
       </div>
 
       <div id="player-inline" class="player-inline">
@@ -820,9 +1412,17 @@
             <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"></path></svg>
           </button>
         </div>
-        <div class="player-cover-wrap">
+        <div class="player-cover-wrap" id="player-cover-wrap">
           <img id="player-cover" src="" alt="">
         </div>
+        <!-- Everything but the cover -- in portrait this is just plain
+             block flow same as before (the wrapper is invisible to that
+             layout). In landscape on a short phone screen (see the
+             (max-height: 500px) media query) this becomes a scrollable
+             column sitting beside the cover instead of stacked below it,
+             see fitMobilePlayerCover's landscape branch for how the cover
+             gets sized against it. -->
+        <div class="player-inline-body" id="player-inline-body">
         <div class="player-title" id="player-title"></div>
         <div class="player-artist" id="player-artist"></div>
         <div class="player-progress-track"><div id="player-progress-fill" class="player-progress-fill"></div></div>
@@ -833,7 +1433,7 @@
         <div class="player-status" id="player-status">Пауза</div>
         <div class="player-controls">
           <button type="button" id="player-copy-link" class="player-ctrl-btn" title="Копировать ссылку на трек в канале" aria-label="Копировать ссылку на трек">
-            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg>
+            <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg>
           </button>
           <div class="player-controls-center">
             <button type="button" id="player-rewind" class="player-ctrl-btn" title="Перемотать на 10 секунд назад" aria-label="Перемотать на 10 секунд назад">
@@ -855,21 +1455,39 @@
             </div>
           </div>
         </div>
+        <div class="player-meta-row" id="player-meta-row">
+          <span class="listeners-badge" id="listeners-badge">
+            <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></svg>
+            <span id="listeners-count"></span>
+          </span>
+          <span class="player-meta-dot" id="player-meta-dot">·</span>
+          <div class="bitrate-info" id="bitrate-info"></div>
+          <span class="player-meta-dot" id="player-meta-dot-2">·</span>
+          <span class="quality-info" id="quality-info"></span>
+        </div>
         <div class="stream-block">
           <div class="quality-toggle" id="quality-toggle">
             <button type="button" class="quality-btn active" data-quality="mp3">MP3</button>
             <button type="button" class="quality-btn" data-quality="flac">FLAC <span class="quality-sub">lossless</span></button>
           </div>
-          <div class="video-toggle-row" id="video-toggle-row">
-            <a href="#" id="video-link" class="video-toggle-btn" target="_blank" rel="noopener noreferrer">
-              <svg viewBox="0 0 24 24"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
-              <span>Смотреть клип на YouTube</span>
-            </a>
-          </div>
         </div>
-        <div class="player-next" id="player-next">
+        <!-- Desktop only now (see CSS) -- mobile gets its own YouTube
+             button on the mini-player bar instead (#np-youtube-btn), no
+             need to show it twice. Lyrics moved into the cover-expansion
+             modal's action row (.player-description-actions). -->
+        <div class="video-toggle-row" id="video-toggle-row">
+          <a href="#" id="video-link" class="video-toggle-btn" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
+            <span>YouTube</span>
+          </a>
+        </div>
+        <div class="player-next" id="player-next" role="button" tabindex="0" aria-haspopup="true">
           <span class="player-next-label">Далее</span>
           <span class="player-next-track" id="player-next-track"></span>
+          <button type="button" id="player-queue-toggle" class="player-queue-toggle" aria-label="Показать очередь" aria-expanded="false">
+            <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"></path></svg>
+          </button>
+        </div>
         </div>
       </div>
       <audio id="radio-audio" preload="none"></audio>
@@ -877,23 +1495,70 @@
     <div class="side-links stagger-item delay-4">
       <a href="/radio/stream" target="_blank">MP3-поток</a>
       <span class="side-links-dot">·</span>
-      <a href="/musicsmania.m3u" download>M3U</a>
+      <a href="/playlist.m3u" download>M3U</a>
       <span class="side-links-dot">·</span>
       <a href="/radio/stream.flac" target="_blank">FLAC-поток</a>
       <span class="side-links-dot">·</span>
-      <a href="/musicsmania-flac.m3u" download>FLAC M3U</a>
+      <a href="/playlist-flac.m3u" download>FLAC M3U</a>
     </div>
+  </div>
   </div>
 
   <div id="queue-panel" class="queue-panel">
-    <h2>Дальше в эфире</h2>
-    <ul id="queue-list" class="queue-list"></ul>
+    <div id="queue-description-panel" class="queue-description-panel">
+      <h2>Описание</h2>
+      <div id="queue-description-text" class="queue-description-text"></div>
+      <button type="button" id="queue-description-translate" class="queue-description-translate">Перевести на русский</button>
+    </div>
+    <div class="queue-list-wrap">
+      <h2>Далее в эфире</h2>
+      <ul id="queue-list" class="queue-list"></ul>
+    </div>
   </div>
   </div>
 
   <div id="snackbar" class="snackbar">
     <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"></path></svg>
     <span>FLAC расходует в 6-8 раз больше трафика, чем MP3</span>
+  </div>
+
+  <!-- Body-level, not nested inside #player-inline -- that element's own
+       transform (see the entrance-animation cleanup JS) makes it the
+       containing block for any position:fixed descendant, and its
+       overflow-y:hidden (needed so the mobile full-screen player never
+       needs to scroll) would clip this overlay right along with it.
+       Positioned dynamically via JS to sit above #player-queue-toggle. -->
+  <div class="player-queue-backdrop" id="player-queue-backdrop"></div>
+  <div class="player-queue-panel" id="player-queue-panel">
+    <ul class="player-queue-list" id="player-queue-list"></ul>
+  </div>
+
+  <!-- True modal now, not an in-flow panel -- backdrop blocks every
+       interaction with the player underneath while open, closes on the
+       explicit X, on the backdrop itself, or on any empty (non-button,
+       non-text) area inside the card. -->
+  <div class="player-description-backdrop" id="player-description-backdrop">
+    <div class="player-description" id="player-description">
+      <button type="button" id="player-description-close" class="player-description-close" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+      </button>
+      <img id="player-description-cover" class="player-description-cover" src="" alt="">
+      <!-- Wraps text+actions as one group so the landscape breakpoint (see
+           CSS) can put the cover on the left and this whole group on the
+           right, stacked, instead of everything in one flat row. -->
+      <div class="player-description-side">
+        <!-- Mobile-only (see CSS) -- desktop already has the always-visible
+             sidebar copy (.queue-description-panel), so this stays hidden
+             there; mobile has no such sidebar, so this is its only way to
+             read the description at all. -->
+        <div class="player-description-text" id="player-description-text"></div>
+        <div class="player-description-actions">
+          <a href="#" id="player-description-save" class="player-description-action" download>Сохранить обложку</a>
+          <a href="#" id="player-description-google" class="player-description-action" target="_blank" rel="noopener noreferrer">Искать в Google</a>
+          <a href="#" id="lyrics-link" class="player-description-action" target="_blank" rel="noopener noreferrer">Текст песни</a>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/hls.min.js"></script>
@@ -980,14 +1645,84 @@
     let hlsInstance = null;
     let seekControlsAvailable = false;
 
+    const bitrateInfoEl = document.getElementById('bitrate-info');
+    const qualityInfoEl = document.getElementById('quality-info');
+    const playerMetaDot2 = document.getElementById('player-meta-dot-2');
+    let lastMp3Bitrate = null;
+    // Declared here, not down by the other np* variables near
+    // fetchNowPlaying -- applyQuality() below (called synchronously at
+    // load) reaches into renderQualityInfo(), which reads this. A `let`
+    // declared later in the same script is in the temporal dead zone
+    // until execution reaches it, so referencing it from code that runs
+    // earlier throws a ReferenceError and kills everything after it in
+    // this script block (confirmed: this exact bug silently broke
+    // fetchNowPlaying/fetchQueue's setup on every page load until fixed).
+    let npQuality = null;
+    // Real per-track bitrate for the current FLAC file (size/duration of
+    // the actual source, computed backend-side -- see
+    // publish_now_playing.py's source_bitrate_kbps), not a guess. Unlike
+    // MP3 (a fixed 128kbps re-encode, same every track), the lossless
+    // mount passes the source through close to as-is, so this genuinely
+    // varies per track with how compressible the audio is.
+    let npSourceBitrate = null;
+    function renderBitrateInfo() {
+      if (!bitrateInfoEl) return;
+      if (radioQuality === 'flac') {
+        bitrateInfoEl.textContent = npSourceBitrate
+          ? `FLAC · ${npSourceBitrate} kbps`
+          : 'FLAC · lossless';
+      } else {
+        bitrateInfoEl.textContent = lastMp3Bitrate ? `MP3 · ${lastMp3Bitrate} kbps` : 'MP3';
+      }
+    }
+
+    // Release quality (bit depth/sample rate/source, e.g. "16 bit / 44.1
+    // kHz, WEB") describes the *lossless source* -- showing it while the
+    // listener is actually hearing a 128kbps MP3 transcode would be
+    // misleading, so it's FLAC-only.
+    function renderQualityInfo() {
+      if (!qualityInfoEl) return;
+      const show = radioQuality === 'flac' && !!npQuality;
+      qualityInfoEl.textContent = show ? npQuality : '';
+      qualityInfoEl.classList.toggle('hidden', !show);
+      if (playerMetaDot2) playerMetaDot2.classList.toggle('hidden', !show);
+    }
+
     function applyQuality(q) {
       radioQuality = q;
       localStorage.setItem('radioQuality', q);
       document.querySelectorAll('.quality-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.quality === q);
       });
+      renderBitrateInfo();
+      renderQualityInfo();
     }
     applyQuality(radioQuality);
+
+    // Real listener count + live MP3 bitrate, sourced from Icecast on the
+    // backend and republished through a sanitized endpoint (the raw
+    // Icecast status-json.xsl leaks the backend's real IP and admin
+    // email, which the whole relay setup exists to hide).
+    const listenersBadge = document.getElementById('listeners-badge');
+    const listenersCountEl = document.getElementById('listeners-count');
+    async function fetchListeners() {
+      try {
+        const resp = await fetch('/radio/listeners.json', { cache: 'no-store' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        const count = data.listeners || 0;
+        listenersCountEl.textContent = count === 1 ? '1 слушает' : `${count} слушают`;
+        listenersBadge.classList.add('visible');
+        if (data.bitrate_mp3) {
+          lastMp3Bitrate = data.bitrate_mp3;
+          renderBitrateInfo();
+        }
+      } catch (e) {
+        // best-effort -- leave the last known value showing
+      }
+    }
+    fetchListeners();
+    setInterval(fetchListeners, 5000);
 
     const snackbar = document.getElementById('snackbar');
     let snackbarTimer = null;
@@ -1006,6 +1741,50 @@
     // window.open() instead gives us a handle to poll: if that 401 page
     // shows up, close the popup ourselves and surface a real message here.
     const adminLink = document.getElementById('admin-link');
+
+    const DESKTOP_QUERY = window.matchMedia('(min-width: 1025px)');
+    function positionAdminLink() {
+      if (!DESKTOP_QUERY.matches) {
+        adminLink.style.left = '';
+        adminLink.style.top = '';
+        return;
+      }
+      const cardRect = cardBroadcast.getBoundingClientRect();
+      // Queue panel collapses (opacity/max-height) when there's no queue
+      // data -- fall back to the player card's own right edge so the
+      // button doesn't jump to some stale/zero-size rect in that case.
+      const queueVisible = queuePanel.classList.contains('visible');
+      const rightEdge = queueVisible ? queuePanel.getBoundingClientRect().right : cardRect.right;
+      const gap = 12;
+      const btnSize = adminLink.getBoundingClientRect().width || 36;
+      // position:fixed coordinates are viewport-relative already, same as
+      // getBoundingClientRect() -- adding window.scrollX/scrollY here was
+      // double-compensating for scroll, pushing the button further off
+      // toward (and eventually past) the bottom of the viewport the more
+      // the page had scrolled when this last ran, which is very likely
+      // why it looked like it had vanished entirely.
+      // Clamped to the viewport's own bottom edge too -- on short windows
+      // (laptop screens with browser chrome eating vertical space) the
+      // card's natural bottom edge can itself sit past the fold, which
+      // pushed the button off-screen the same way the scroll bug did.
+      const maxTop = window.innerHeight - btnSize - gap;
+      adminLink.style.left = (rightEdge - btnSize) + 'px';
+      adminLink.style.top = Math.min(cardRect.bottom + gap, maxTop) + 'px';
+    }
+    window.addEventListener('resize', positionAdminLink);
+    DESKTOP_QUERY.addEventListener('change', positionAdminLink);
+    // Either anchor's box can change height/visibility for reasons that
+    // have nothing to do with a window resize (queue emptying out, the
+    // YouTube-link row toggling on/off, quality info showing/hiding) --
+    // ResizeObserver catches all of those generically instead of hunting
+    // down every individual code path that might affect either box.
+    if (window.ResizeObserver) {
+      const adminLinkObserver = new ResizeObserver(positionAdminLink);
+      adminLinkObserver.observe(cardBroadcast);
+      adminLinkObserver.observe(queuePanel);
+    }
+    positionAdminLink();
+
     adminLink.addEventListener('click', (e) => {
       e.preventDefault();
       const popup = window.open(adminLink.href, '_blank');
@@ -1087,7 +1866,18 @@
       const hlsUrl = HLS_URLS[radioQuality];
       const canTryHlsJs = radioQuality === 'mp3' && window.Hls && Hls.isSupported();
       if (canTryHlsJs) {
-        const hls = new Hls({ liveSyncDurationCount: 3, liveMaxLatencyDurationCount: 10 });
+        // liveMaxLatencyDurationCount caps how far hls.js is allowed to
+        // drift behind the live edge before it force-seeks back -- at 6s
+        // segments, 10 meant up to 60s of drift. fetchNowPlaying() below
+        // reads hlsInstance.latency to delay revealing a new track until
+        // it's actually audible, but that delay is capped at 30s; letting
+        // real latency drift past that cap meant the site could reveal
+        // the new track's name/cover up to ~30s before a listener whose
+        // stream had drifted to the far end of that range actually heard
+        // it -- confirmed directly as "сильная задержка, играло
+        // предыдущее". Kept below the 30s reveal cap (with headroom) so
+        // real latency can never exceed what's actually compensated for.
+        const hls = new Hls({ liveSyncDurationCount: 3, liveMaxLatencyDurationCount: 4 });
         hlsInstance = hls;
         let started = false;
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -1151,7 +1941,12 @@
     function setPlayingUI(isPlaying) {
       playerPlayPauseIcon.innerHTML = isPlaying ? iconPauseBars : iconPlayTriangle;
       playerPlayPauseBtn.title = isPlaying ? 'Пауза' : 'Играть';
-      playerStatus.textContent = isPlaying ? 'Играет' : 'Пауза';
+      // Hidden here -- "Играет"/"Пауза" duplicates what the play/pause
+      // icon already shows. This row only earns its space back for the
+      // reconnecting/loading states below, which the icon can't convey.
+      playerStatus.style.display = 'none';
+      npPlayPauseIcon.innerHTML = isPlaying ? iconPauseBars : iconPlayTriangle;
+      npPlayPauseBtn.title = isPlaying ? 'Пауза' : 'Играть';
       updateMediaSessionPlaybackState();
     }
 
@@ -1179,6 +1974,7 @@
       console.warn('Playback interrupted, reconnecting:', reason);
       playerPlayPauseBtn.title = 'Переподключение...';
       playerStatus.textContent = 'Переподключение...';
+      playerStatus.style.display = 'block';
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
         if (userWantsPlayback) startPlayback();
@@ -1193,6 +1989,7 @@
         setPlayingUI(true);
         playerPlayPauseBtn.title = 'Загрузка...';
         playerStatus.textContent = 'Загрузка...';
+        playerStatus.style.display = 'block';
       } else {
         userWantsPlayback = false;
         clearReconnectTimer();
@@ -1223,8 +2020,66 @@
     radioAudio.addEventListener('waiting', () => {
       playerPlayPauseBtn.title = 'Загрузка...';
       playerStatus.textContent = 'Загрузка...';
+      playerStatus.style.display = 'block';
     });
     radioAudio.addEventListener('error', () => scheduleReconnect('media element error'));
+
+    // A live stream can go silent (server-side hiccup, a mobile network
+    // blip, a tab backgrounded and its connection quietly suspended) without
+    // radioAudio ever firing 'error' -- confirmed directly: playback froze
+    // mid-listen on mobile, tab in the foreground the whole time, with
+    // nothing above ever triggering a reconnect. Unlike a finite file, an
+    // infinite live stream has no clean "this definitely failed" signal for
+    // the browser to raise as an error; it can just sit in 'waiting' forever.
+    //
+    // Tied to the 'timeupdate' event itself (fires many times a second
+    // during healthy playback) rather than polling currentTime on a fixed
+    // cadence -- comparing two values sampled some interval apart means the
+    // actual detection delay is anywhere between 0 and a full interval
+    // depending on when the stall happened to start relative to the last
+    // sample. Tracking real elapsed wall-clock time since the last genuine
+    // progress event instead measures the stall itself, not however the
+    // polling cadence happened to line up with it. Shared by both the
+    // periodic watchdog below and the tab-visibility check right after it,
+    // so "stalled" means the same thing in both places.
+    //
+    // 2s threshold, not shorter: a live track transition or brief network
+    // jitter can legitimately leave currentTime looking static for a second
+    // or so even on a perfectly healthy stream -- much below that starts
+    // tearing down and reconnecting a stream that was about to recover on
+    // its own anyway.
+    let lastProgressAt = Date.now();
+    radioAudio.addEventListener('timeupdate', () => { lastProgressAt = Date.now(); });
+    const STALL_THRESHOLD = 2000; // ms
+    function isPlaybackStalled() {
+      return radioAudio.paused || (Date.now() - lastProgressAt >= STALL_THRESHOLD);
+    }
+    setInterval(() => {
+      if (!userWantsPlayback || radioAudio.paused) {
+        lastProgressAt = Date.now();
+        return;
+      }
+      if (isPlaybackStalled()) {
+        scheduleReconnect('no timeupdate for ' + STALL_THRESHOLD + 'ms');
+      }
+    }, 500);
+
+    // Mobile browsers can silently suspend the stream connection while the
+    // tab is backgrounded (screen lock, switching apps) without ever firing
+    // the audio element's own 'error'/'waiting' events -- the periodic
+    // watchdog above may itself be throttled/paused by the browser while
+    // hidden, so nothing would notice until this fires. Treat returning to
+    // the foreground as a cue to check the same stall condition immediately
+    // and force a reconnect if it's stalled, and refresh nowplaying/queue
+    // right away rather than waiting for their next 5s poll tick.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (userWantsPlayback && isPlaybackStalled()) {
+        scheduleReconnect('tab returned to foreground with stalled playback');
+      }
+      fetchNowPlaying();
+      fetchQueue();
+    });
 
     const npBlock = document.getElementById('now-playing');
     const npCover = document.getElementById('np-cover');
@@ -1233,7 +2088,17 @@
     const npProgressFill = document.getElementById('np-progress-fill');
     const npElapsedEl = document.getElementById('np-elapsed');
     const npDurationEl = document.getElementById('np-duration');
+    const npPlayPauseBtn = document.getElementById('np-playpause-btn');
+    const npPlayPauseIcon = document.getElementById('np-playpause-icon');
+    // Minimal control on the mini-player: play/pause only. Must stop
+    // propagation, otherwise the click bubbles up to npBlock's own handler
+    // and expands the full player at the same time it toggles playback.
+    npPlayPauseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleRadio();
+    });
     let npLastUpdated = null;
+    let npPendingUpdated = null;
     let npDuration = null;
     let npStartedAt = null;
 
@@ -1252,6 +2117,33 @@
       const m = Math.floor(secs / 60);
       const s = secs % 60;
       return m + ':' + String(s).padStart(2, '0');
+    }
+
+    // Sets text via an inner span rather than el.textContent directly so
+    // overflowing titles/artists can scroll instead of just ellipsizing.
+    // el.textContent still reads back correctly through the wrapper (it
+    // includes descendant text), so nothing reading these elements
+    // elsewhere needs to change.
+    function setMarqueeText(el, text) {
+      text = text || '';
+      let span = el.querySelector(':scope > .marquee-inner');
+      if (!span) {
+        el.textContent = '';
+        span = document.createElement('span');
+        span.className = 'marquee-inner';
+        el.appendChild(span);
+      }
+      span.textContent = text;
+      el.classList.remove('marquee-scrolling');
+      span.style.transform = '';
+      requestAnimationFrame(() => {
+        const overflow = span.scrollWidth - el.clientWidth;
+        if (overflow > 4) {
+          el.style.setProperty('--marquee-distance', `-${overflow}px`);
+          el.style.setProperty('--marquee-duration', `${Math.max(6, overflow / 30)}s`);
+          el.classList.add('marquee-scrolling');
+        }
+      });
     }
 
     function serverElapsed() {
@@ -1326,6 +2218,132 @@
 
     const playerCoverWrap = document.querySelector('.player-cover-wrap');
     const MOBILE_QUERY = '(max-width: 1024px)';
+    // Matches the (max-width: 1024px) and (max-height: 500px) CSS
+    // breakpoint for the side-by-side landscape phone layout -- keyed on
+    // height, not orientation, so a landscape tablet (plenty of height to
+    // spare) keeps the normal portrait-style stacked layout instead.
+    const LANDSCAPE_QUERY = '(max-height: 500px)';
+
+    // Tapping the cover reveals a full-screen view of it (proportions
+    // preserved, no cropping) -- the description text itself lives only
+    // in the always-visible desktop sidebar now (see
+    // .queue-description-panel), not duplicated here.
+    const playerDescriptionBackdrop = document.getElementById('player-description-backdrop');
+    const playerDescription = document.getElementById('player-description');
+    const playerDescriptionClose = document.getElementById('player-description-close');
+    const playerDescriptionCover = document.getElementById('player-description-cover');
+    const playerDescriptionText = document.getElementById('player-description-text');
+    const playerDescriptionSave = document.getElementById('player-description-save');
+    const playerDescriptionGoogle = document.getElementById('player-description-google');
+    // Desktop-only sidebar copy of the same description, always visible
+    // (no tap needed) under the queue panel -- see .queue-description-panel.
+    const queueDescriptionText = document.getElementById('queue-description-text');
+    const queueDescriptionTranslateBtn = document.getElementById('queue-description-translate');
+    let queueDescriptionOriginalText = '';
+    let queueDescriptionShowingTranslation = false;
+
+    // Real scroll state, not a guess -- fade only shows on the edge that
+    // actually has more (clipped) text past it.
+    function updateDescriptionFade() {
+      const el = queueDescriptionText;
+      const hasAbove = el.scrollTop > 2;
+      const hasBelow = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
+      el.classList.toggle('fade-top', hasAbove);
+      el.classList.toggle('fade-bottom', hasBelow);
+    }
+    queueDescriptionText.addEventListener('scroll', updateDescriptionFade);
+    window.addEventListener('resize', updateDescriptionFade);
+
+    // Cheap heuristic, no network call needed -- counts Cyrillic vs Latin
+    // letters and goes with whichever the text actually has more of.
+    // publish_now_playing.py now prefers ru.wikipedia.org before falling
+    // back to English (see fetch_wikipedia_description), so a lot of
+    // descriptions are already Russian -- offering to "translate" text
+    // that's already in Russian was just noise.
+    function looksAlreadyRussian(text) {
+      const cyrillic = (text.match(/[а-яё]/gi) || []).length;
+      const latin = (text.match(/[a-z]/gi) || []).length;
+      return cyrillic > latin;
+    }
+
+    function updatePlayerDescription(description, coverUrl, artist, title) {
+      const currentDescriptionText = (description || '').trim();
+      const displayText = currentDescriptionText || 'Описания нет';
+      queueDescriptionText.textContent = displayText;
+      queueDescriptionText.scrollTop = 0;
+      updateDescriptionFade();
+      playerDescriptionText.textContent = displayText;
+      queueDescriptionOriginalText = currentDescriptionText;
+      queueDescriptionShowingTranslation = false;
+      queueDescriptionTranslateBtn.textContent = 'Перевести на русский';
+      // Only worth showing when there's real text AND it isn't already
+      // Russian.
+      const needsTranslateBtn = currentDescriptionText && !looksAlreadyRussian(currentDescriptionText);
+      queueDescriptionTranslateBtn.style.display = needsTranslateBtn ? '' : 'none';
+      playerDescriptionCover.src = coverUrl || '';
+      playerDescriptionSave.href = coverUrl || '#';
+      const query = `${artist || ''} ${title || ''}`.trim();
+      playerDescriptionGoogle.href = query
+        ? 'https://www.google.com/search?q=' + encodeURIComponent(query)
+        : '#';
+    }
+
+    // translate.googleapis.com's "gtx" client is the same unofficial-but-
+    // widely-used free endpoint powering a lot of open-source translate
+    // widgets -- no API key needed, browser calls it directly, same spirit
+    // as the yt-dlp fallback elsewhere: not the officially sanctioned path,
+    // but text-only and never anything resembling redistributing media.
+    async function translateToRussian(text) {
+      const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ru&dt=t&q='
+        + encodeURIComponent(text);
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('translate HTTP ' + resp.status);
+      const data = await resp.json();
+      return (data[0] || []).map((segment) => segment[0]).join('');
+    }
+
+    queueDescriptionTranslateBtn.addEventListener('click', async () => {
+      if (queueDescriptionShowingTranslation) {
+        queueDescriptionText.textContent = queueDescriptionOriginalText;
+        queueDescriptionTranslateBtn.textContent = 'Перевести на русский';
+        queueDescriptionShowingTranslation = false;
+        queueDescriptionText.scrollTop = 0;
+        updateDescriptionFade();
+        return;
+      }
+      const original = queueDescriptionTranslateBtn.textContent;
+      queueDescriptionTranslateBtn.textContent = 'Переводим...';
+      try {
+        const translated = await translateToRussian(queueDescriptionOriginalText);
+        queueDescriptionText.textContent = translated;
+        queueDescriptionTranslateBtn.textContent = 'Показать оригинал';
+        queueDescriptionShowingTranslation = true;
+        queueDescriptionText.scrollTop = 0;
+        updateDescriptionFade();
+      } catch (e) {
+        console.error('translation failed:', e);
+        queueDescriptionTranslateBtn.textContent = 'Не удалось перевести';
+        setTimeout(() => { queueDescriptionTranslateBtn.textContent = original; }, 2500);
+      }
+    });
+
+    function openPlayerDescription() {
+      playerDescriptionBackdrop.classList.add('visible');
+      lockBackgroundScroll();
+    }
+    function closePlayerDescription() {
+      playerDescriptionBackdrop.classList.remove('visible');
+      if (!playerInline.classList.contains('expanded')) unlockBackgroundScroll();
+    }
+    playerCoverWrap.addEventListener('click', openPlayerDescription);
+    playerDescriptionClose.addEventListener('click', closePlayerDescription);
+    // Close on backdrop click or a tap on the card's own free space, but not
+    // on the image/action buttons inside it.
+    playerDescriptionBackdrop.addEventListener('click', (e) => {
+      if (e.target === playerDescriptionBackdrop || e.target === playerDescription) {
+        closePlayerDescription();
+      }
+    });
 
     // No scrolling in the mobile full-screen player -- everything needs to
     // fit in one screen instead. Every row but the cover renders at its own
@@ -1336,6 +2354,16 @@
     function fitMobilePlayerCover() {
       if (!window.matchMedia(MOBILE_QUERY).matches) return;
       if (!playerInline.classList.contains('expanded')) return;
+      if (window.matchMedia(LANDSCAPE_QUERY).matches) {
+        // CSS alone handles sizing in the landscape layout (cover gets
+        // height:100% of the row, width follows from its own
+        // aspect-ratio:1/1) -- clear any maxWidth this function set
+        // during a previous portrait measurement so it can't override
+        // that (inline styles win over stylesheet rules regardless of
+        // selector specificity).
+        playerCoverWrap.style.maxWidth = '';
+        return;
+      }
       const style = getComputedStyle(playerInline);
       const availableHeight = playerInline.clientHeight
         - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
@@ -1374,25 +2402,100 @@
       npBlock.setAttribute('aria-expanded', 'true');
       if (isMobile) {
         lockBackgroundScroll();
+        // A fake history entry so the phone's system back button/gesture
+        // closes the player instead of leaving the page entirely -- see
+        // the popstate handler below.
+        history.pushState({ musicmaniaPlayerExpanded: true }, '');
         // One frame late: the cover still has its old size (or none) until
         // the browser lays the just-added .expanded content out, so the
         // "other rows" measurement above would be wrong if taken now.
         requestAnimationFrame(fitMobilePlayerCover);
       }
     }
-    function collapsePlayer() {
+    // fromPopState: true when called because the back button/gesture (or
+    // our own swipe-close's history.back() below) already consumed the
+    // pushed history entry -- calling history.back() again in that case
+    // would navigate past the player to wherever the user was before it,
+    // instead of just landing back on the plain page.
+    function collapsePlayer(fromPopState) {
       const isMobile = window.matchMedia(MOBILE_QUERY).matches;
       npBlock.setAttribute('aria-expanded', 'false');
       unlockBackgroundScroll();
       playerInline.classList.remove('expanded');
+      playerInline.style.transform = '';
+      closeQueuePanel();
+      closePlayerDescription();
       if (isMobile) {
         // Swap straight to .closing so the fixed full-screen box (and its
         // opacity/transform transition) stays in place while it fades out,
         // instead of snapping back into normal flow instantly.
         playerInline.classList.add('closing');
         setTimeout(() => playerInline.classList.remove('closing'), 260);
+        if (!fromPopState && history.state && history.state.musicmaniaPlayerExpanded) {
+          history.back();
+        }
       }
     }
+    window.addEventListener('popstate', () => {
+      if (playerInline.classList.contains('expanded')) {
+        collapsePlayer(true);
+      }
+    });
+
+    // Swipe-down-to-close, matching the platform convention for full-screen
+    // sheets (Spotify/Apple Music-style now-playing screens). Starts
+    // tracking from anywhere in the player except actual controls (a tap
+    // on the volume slider or a button shouldn't also start a drag).
+    let touchStartY = null;
+    let touchDeltaY = 0;
+    let touchStartedAt = 0;
+    const SWIPE_CLOSE_DISTANCE = 100; // px
+    const SWIPE_CLOSE_VELOCITY = 0.5; // px/ms -- catches a fast flick that doesn't travel far
+
+    function onPlayerTouchStart(e) {
+      if (!window.matchMedia(MOBILE_QUERY).matches) return;
+      if (!playerInline.classList.contains('expanded')) return;
+      if (e.target.closest('button, a, input')) return;
+      touchStartY = e.touches[0].clientY;
+      touchDeltaY = 0;
+      touchStartedAt = Date.now();
+      playerInline.style.transition = 'none';
+    }
+    function onPlayerTouchMove(e) {
+      if (touchStartY === null) return;
+      touchDeltaY = Math.max(0, e.touches[0].clientY - touchStartY);
+      playerInline.style.transform = `translateY(${touchDeltaY}px)`;
+      e.preventDefault();
+    }
+    function onPlayerTouchEnd() {
+      if (touchStartY === null) return;
+      const elapsed = Math.max(1, Date.now() - touchStartedAt);
+      const velocity = touchDeltaY / elapsed;
+      touchStartY = null;
+      if (touchDeltaY > SWIPE_CLOSE_DISTANCE || velocity > SWIPE_CLOSE_VELOCITY) {
+        // Keep animating downward off-screen instead of handing off to
+        // collapsePlayer()'s own .closing transition, which targets a
+        // small translateY(16px) resting offset meant for the button/
+        // backdrop close -- miles short of wherever a swipe had already
+        // dragged the player, so the handoff looked like the player
+        // reversing direction and jumping back up right as it closed.
+        playerInline.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+        playerInline.style.transform = 'translateY(100%)';
+        playerInline.style.opacity = '0';
+        setTimeout(() => {
+          collapsePlayer();
+          playerInline.style.transition = '';
+          playerInline.style.opacity = '';
+        }, 200);
+      } else {
+        playerInline.style.transition = '';
+        playerInline.style.transform = '';
+      }
+    }
+    playerInline.addEventListener('touchstart', onPlayerTouchStart, { passive: true });
+    playerInline.addEventListener('touchmove', onPlayerTouchMove, { passive: false });
+    playerInline.addEventListener('touchend', onPlayerTouchEnd);
+    playerInline.addEventListener('touchcancel', onPlayerTouchEnd);
     npBlock.addEventListener('click', () => {
       if (playerInline.classList.contains('expanded')) collapsePlayer();
       else expandPlayer();
@@ -1406,65 +2509,48 @@
     });
     playerCollapseBtn.addEventListener('click', collapsePlayer);
 
-    // Music video link lookup: entirely client-side, browser-to-Google
-    // directly -- no embedding, no proxying, just a plain link out to the
-    // video's own watch page on youtube.com.
-    const YOUTUBE_API_KEY = 'AIzaSyAfEYPytHSAmfp1ePXcuto3LxbjOmXtonk';
+    // Music video link: the lookup itself now happens server-side, once
+    // per track (see publish_now_playing.py) instead of once per listener's
+    // browser -- search.list costs 100 quota units per call, and with
+    // tracks changing every few minutes, every listener independently
+    // searching blew through YouTube's free daily quota (10,000 units)
+    // within hours. The frontend just reads whatever video_id (or null)
+    // nowplaying.json already carries from the poll it's doing anyway.
     const videoToggleRow = document.getElementById('video-toggle-row');
     const videoLink = document.getElementById('video-link');
-    let videoCheckToken = 0;
+    const lyricsLink = document.getElementById('lyrics-link');
+    // Mobile's copy of the YouTube link, on the mini-player bar -- see
+    // .np-youtube-btn. Must stop propagation like np-playpause-btn, or the
+    // tap bubbles up to npBlock's own expand-to-full-player handler too.
+    const npYoutubeBtn = document.getElementById('np-youtube-btn');
+    npYoutubeBtn.addEventListener('click', (e) => { e.stopPropagation(); });
 
-    // "official video" biases YouTube's own ranking toward an actual music
-    // video over "official audio" uploads (a still cover image with the
-    // track playing, technically a valid search hit but not what "смотреть
-    // клип" means). maxResults doesn't add to the quota cost -- search.list
-    // is a flat 100 units per call regardless -- so asking for several and
-    // filtering title text for audio-only tells ("audio", "lyric video",
-    // etc.) costs nothing extra over taking just the top hit blindly.
-    const AUDIO_ONLY_HINT_RE = /\b(audio|аудио|lyric|lyrics|lyric video|текст песни|static|cover art|provided to youtube)\b/i;
-    // Every track submitted through YouTube's music-distribution/Content ID
-    // pipeline automatically gets an auto-generated upload on a channel
-    // named "{Artist} - Topic" -- always a still image with the track
-    // playing, never an actual video. Channel name is a much more reliable
-    // signal for this than anything in the title text.
-    const TOPIC_CHANNEL_RE = /- Topic$/i;
-
-    async function searchYoutubeVideo(query) {
-      const url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q='
-        + encodeURIComponent(query + ' official video') + '&key=' + YOUTUBE_API_KEY;
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('YouTube search HTTP ' + resp.status);
-      const data = await resp.json();
-      const items = (data.items || []).filter((item) => item.id && item.id.videoId);
-      if (!items.length) return null;
-      const preferred = items.find((item) => {
-        const title = (item.snippet && item.snippet.title) || '';
-        const channel = (item.snippet && item.snippet.channelTitle) || '';
-        return !AUDIO_ONLY_HINT_RE.test(title) && !TOPIC_CHANNEL_RE.test(channel);
-      });
-      return (preferred || items[0]).id.videoId;
+    function updateVideoLink(videoId) {
+      if (videoId) {
+        const url = 'https://www.youtube.com/watch?v=' + videoId;
+        videoLink.href = url;
+        videoLink.style.display = '';
+        videoToggleRow.classList.add('visible');
+        npYoutubeBtn.href = url;
+        npYoutubeBtn.style.display = '';
+      } else {
+        videoLink.style.display = 'none';
+        videoToggleRow.classList.remove('visible');
+        npYoutubeBtn.style.display = 'none';
+      }
     }
 
-    function currentTrackQuery() {
-      return ((playerArtist.textContent || '') + ' ' + (playerTitle.textContent || '')).trim();
-    }
-
-    // Runs on every track change (see fetchNowPlaying) so the link only
-    // ever shows once a matching video is confirmed to exist.
-    async function refreshVideoAvailability() {
-      const query = currentTrackQuery();
-      const token = ++videoCheckToken;
-      videoToggleRow.classList.remove('visible');
-      if (!query) return;
-      try {
-        const videoId = await searchYoutubeVideo(query);
-        if (token !== videoCheckToken) return; // track changed again since this call started
-        if (videoId) {
-          videoLink.href = 'https://www.youtube.com/watch?v=' + videoId;
-          videoToggleRow.classList.add('visible');
-        }
-      } catch (e) {
-        console.error('YouTube availability check failed:', e);
+    // Just a search link out to Genius -- no lyrics are fetched, stored,
+    // or shown on this site itself. Lives in the cover-expansion modal's
+    // action row now (.player-description-actions), not a standalone row
+    // of its own -- always shows/hides independently of the YouTube link.
+    function updateLyricsLink(artist, title) {
+      const query = [artist, title].filter(Boolean).join(' ').trim();
+      if (query) {
+        lyricsLink.href = 'https://genius.com/search?q=' + encodeURIComponent(query);
+        lyricsLink.style.display = '';
+      } else {
+        lyricsLink.style.display = 'none';
       }
     }
 
@@ -1499,11 +2585,26 @@
       if (e.target === playerVolumePopup || playerVolumePopup.contains(e.target)) return;
       playerVolumePopup.classList.remove('visible');
     });
+    function setVolume(value) {
+      const clamped = Math.max(0, Math.min(100, Math.round(value)));
+      playerVolumeSlider.value = clamped;
+      radioAudio.volume = clamped / 100;
+      localStorage.setItem('radioVolume', clamped);
+      refreshVolumeIcon(clamped);
+    }
     playerVolumeSlider.addEventListener('input', () => {
-      radioAudio.volume = playerVolumeSlider.value / 100;
-      localStorage.setItem('radioVolume', playerVolumeSlider.value);
-      refreshVolumeIcon(playerVolumeSlider.value);
+      setVolume(playerVolumeSlider.value);
     });
+
+    let volumeBeforeMute = null;
+    function toggleMute() {
+      if (Number(playerVolumeSlider.value) > 0) {
+        volumeBeforeMute = playerVolumeSlider.value;
+        setVolume(0);
+      } else {
+        setVolume(volumeBeforeMute || 80);
+      }
+    }
 
     // Media Session: shows cover, track info and transport controls in the
     // OS-level media notification -- lock screen and notification shade on
@@ -1518,9 +2619,9 @@
       // lets the browser sniff the real type from the response instead of
       // rejecting a mismatched one.
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: playerTitle.textContent || 'MusicmaniA Radio',
-        artist: playerArtist.textContent || 'MusicmaniA',
-        album: 'MusicmaniA Radio',
+        title: playerTitle.textContent || 'Your Radio',
+        artist: playerArtist.textContent || 'Your Radio',
+        album: 'Your Radio',
         artwork: [
           { src: playerCover.src || '/avatar.jpg' }
         ]
@@ -1631,50 +2732,87 @@
         const response = await fetch('/radio/nowplaying.json', { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP error ' + response.status);
         const data = await response.json();
-        if (data.updated === npLastUpdated) {
-          // Same track: keep progress bar in sync with server without re-fading UI
-          npDuration = data.duration || null;
-          npStartedAt = data.started_at || null;
-          tickProgress();
+        if (data.updated === npLastUpdated || data.updated === npPendingUpdated) {
+          if (data.updated === npLastUpdated) {
+            // Same track already revealed: keep progress bar in sync with
+            // server without re-fading UI.
+            npDuration = data.duration || null;
+            npStartedAt = data.started_at || null;
+            tickProgress();
+          }
+          // Otherwise a reveal for this track is already scheduled below --
+          // nothing new to do until it fires.
           return;
         }
-        npLastUpdated = data.updated;
-        npDuration = data.duration || null;
-        npStartedAt = data.started_at || null;
-        if (!radioAudio.paused) {
-          reanchor();
-        }
 
-        npBlock.classList.add('np-fading');
-        cardBroadcast.classList.add('player-fading');
+        // nowplaying.json flips the instant Liquidsoap crosses a track
+        // boundary, but a listener on the HLS/DVR path (mp3 quality via
+        // hls.js) is deliberately kept liveSyncDurationCount segments
+        // behind the live edge for rebuffer resilience -- so the UI was
+        // announcing the next track (and its progress bar) ~18s+ before it
+        // was actually audible. hls.js's own `latency` getter tracks the
+        // listener's actual live playback distance from the live edge, so
+        // delay the whole reveal (progress-bar state included, or it'd
+        // start counting the new track's elapsed time next to the old
+        // track's still-visible name) by that amount. The plain-stream path
+        // (FLAC quality, or HLS fallback) only has normal network
+        // buffering, small enough to ignore.
+        let displayDelayMs = 0;
+        if (radioQuality === 'mp3' && hlsInstance) {
+          const latency = hlsInstance.latency;
+          if (Number.isFinite(latency) && latency > 0) {
+            displayDelayMs = Math.min(latency, 30) * 1000;
+          }
+        }
+        npPendingUpdated = data.updated;
+
         setTimeout(() => {
-          npTitle.textContent = data.title || 'Неизвестный трек';
-          npArtist.textContent = data.artist || 'MusicmaniA';
-          npCover.src = data.cover || '/avatar.jpg';
-          npDurationEl.textContent = npDuration ? formatTime(npDuration) : '--:--';
-          npElapsedEl.textContent = '0:00';
-          npProgressFill.style.width = '0%';
-          playerTitle.textContent = npTitle.textContent;
-          playerArtist.textContent = npArtist.textContent;
-          playerCover.src = npCover.src;
-          playerDurationEl.textContent = npDurationEl.textContent;
-          playerElapsedEl.textContent = '0:00';
-          playerProgressFill.style.width = '0%';
-          npLink = data.link || null;
-          playerCopyBtn.disabled = !npLink;
-          updateMediaSessionMetadata();
-          npBlock.classList.add('visible');
-          npBlock.classList.remove('np-fading');
-          cardBroadcast.classList.remove('player-fading');
-          tickProgress();
-          // Title/artist text can wrap differently for a new track, which
-          // changes how much height the non-cover rows take up.
-          fitMobilePlayerCover();
-          // Re-check clip availability for the new track -- also keeps an
-          // already-open video panel in sync instead of leaving the
-          // previous track's clip up.
-          refreshVideoAvailability();
-        }, 220);
+          // A newer track may have superseded this one while waiting --
+          // skip revealing a now-stale intermediate track.
+          if (npPendingUpdated !== data.updated) return;
+          npPendingUpdated = null;
+          npLastUpdated = data.updated;
+          npDuration = data.duration || null;
+          npStartedAt = data.started_at || null;
+          if (!radioAudio.paused) {
+            reanchor();
+          }
+
+          npBlock.classList.add('np-fading');
+          cardBroadcast.classList.add('player-fading');
+          setTimeout(() => {
+            setMarqueeText(npTitle, data.title || 'Неизвестный трек');
+            setMarqueeText(npArtist, data.artist || 'Your Radio');
+            npCover.src = data.cover || '/avatar.jpg';
+            npDurationEl.textContent = npDuration ? formatTime(npDuration) : '--:--';
+            npElapsedEl.textContent = '0:00';
+            npProgressFill.style.width = '0%';
+            setMarqueeText(playerTitle, npTitle.textContent);
+            setMarqueeText(playerArtist, npArtist.textContent);
+            playerCover.src = npCover.src;
+            playerDurationEl.textContent = npDurationEl.textContent;
+            playerElapsedEl.textContent = '0:00';
+            playerProgressFill.style.width = '0%';
+            npLink = data.link || null;
+            playerCopyBtn.disabled = !npLink;
+            npQuality = data.quality || null;
+            npSourceBitrate = data.source_bitrate_kbps || null;
+            renderQualityInfo();
+            renderBitrateInfo();
+            updateMediaSessionMetadata();
+            npBlock.classList.add('visible');
+            npBlock.classList.remove('np-fading');
+            cardBroadcast.classList.remove('player-fading');
+            tickProgress();
+            updateVideoLink(data.video_id || null);
+            updateLyricsLink(data.artist, data.title);
+            updatePlayerDescription(data.description || '', playerCover.src, data.artist, data.title);
+            // Title/artist text can wrap differently for a new track, and
+            // the video link row toggling on/off both change how much
+            // height the non-cover rows take up.
+            fitMobilePlayerCover();
+          }, 220);
+        }, displayDelayMs);
       } catch (e) {
         console.error('Ошибка получения текущего трека:', e);
       }
@@ -1683,14 +2821,67 @@
     const queueList = document.getElementById('queue-list');
     const playerNextWrap = document.getElementById('player-next');
     const playerNextTrackEl = document.getElementById('player-next-track');
+    const playerQueueToggle = document.getElementById('player-queue-toggle');
+    const playerQueuePanel = document.getElementById('player-queue-panel');
+    const playerQueueBackdrop = document.getElementById('player-queue-backdrop');
+    const playerQueueList = document.getElementById('player-queue-list');
+    let lastQueueItems = [];
+
+    function renderPlayerQueueList() {
+      updateQueueList(playerQueueList, lastQueueItems);
+    }
+    function positionPlayerQueuePanel() {
+      const row = playerNextWrap.getBoundingClientRect();
+      playerQueuePanel.style.left = row.left + 'px';
+      playerQueuePanel.style.width = row.width + 'px';
+      playerQueuePanel.style.bottom = (window.innerHeight - row.top + 10) + 'px';
+    }
+    function closeQueuePanel() {
+      playerQueuePanel.classList.remove('visible');
+      playerQueueBackdrop.classList.remove('visible');
+      playerQueueToggle.setAttribute('aria-expanded', 'false');
+      playerQueueToggle.setAttribute('aria-label', 'Показать очередь');
+    }
+    function toggleQueuePanel() {
+      // Body-level position:fixed overlay now (see HTML) -- doesn't push
+      // anything else in the player around, so no fitMobilePlayerCover()
+      // recalculation needed here, but its position has to be computed
+      // fresh each time since nothing anchors it via CSS alone anymore.
+      if (playerQueuePanel.classList.contains('visible')) {
+        closeQueuePanel();
+        return;
+      }
+      playerQueuePanel.classList.add('visible');
+      playerQueueBackdrop.classList.add('visible');
+      playerQueueToggle.setAttribute('aria-expanded', 'true');
+      playerQueueToggle.setAttribute('aria-label', 'Скрыть очередь');
+      positionPlayerQueuePanel();
+      renderPlayerQueueList();
+    }
+    // Invisible click-catcher behind the panel -- blocks taps on the rest
+    // of the page (other player controls, links, etc.) while the queue is
+    // open, and a tap on it (i.e. any free area outside the panel itself)
+    // closes the queue, same interaction model as the description modal.
+    playerQueueBackdrop.addEventListener('click', closeQueuePanel);
+    // Whole row is the tap target, not just the small arrow icon -- the
+    // button stays a real <button> for accessibility/keyboard use, but the
+    // click naturally bubbles up from it to this listener too, so one
+    // handler on the row covers both without double-firing.
+    playerNextWrap.addEventListener('click', toggleQueuePanel);
+    playerNextWrap.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === playerNextWrap) {
+        e.preventDefault();
+        toggleQueuePanel();
+      }
+    });
     let queuePollTimer = null;
     let queueLastUpdated = null;
 
     function buildQueueItem(item, i) {
       const li = document.createElement('li');
+      li.dataset.id = String(item.id);
       const a = document.createElement('a');
       a.className = 'queue-item';
-      a.style.animationDelay = (i * 60) + 'ms';
       if (item.link) { a.href = item.link; a.target = '_blank'; a.rel = 'noopener'; }
       const num = document.createElement('div');
       num.className = 'qi-num';
@@ -1711,6 +2902,93 @@
       return li;
     }
 
+    function updateQueueItemContent(li, item, i) {
+      const num = li.querySelector('.qi-num');
+      if (num) num.textContent = i + 1;
+      const titleEl = li.querySelector('.qi-title');
+      const artistEl = li.querySelector('.qi-artist');
+      const title = item.title || 'Неизвестный трек';
+      const artist = item.artist || '';
+      if (titleEl && titleEl.textContent !== title) titleEl.textContent = title;
+      if (artistEl && artistEl.textContent !== artist) artistEl.textContent = artist;
+      const a = li.querySelector('.queue-item');
+      if (a && item.link) { a.href = item.link; a.target = '_blank'; a.rel = 'noopener'; }
+    }
+
+    // Diffs the new queue against what's currently rendered instead of
+    // wiping and rebuilding the whole list, so: a dropped track fades out
+    // in place, a newly-queued track fades in, and everything else -- most
+    // visibly, the neighbors on either side of a track that got spliced in
+    // mid-queue -- smoothly slides to its new slot rather than jumping.
+    // Classic FLIP (First/Last/Invert/Play): positions are measured before
+    // the DOM update, the update happens instantly, then the delta between
+    // old and new position is played as a transform transition.
+    function updateQueueList(container, items) {
+      const existingEls = Array.from(container.children);
+      const existingById = new Map();
+      existingEls.forEach((el) => existingById.set(el.dataset.id, el));
+      const firstRects = new Map();
+      existingEls.forEach((el) => firstRects.set(el.dataset.id, el.getBoundingClientRect()));
+
+      const newIds = new Set(items.map((it) => String(it.id)));
+
+      existingEls.forEach((el) => {
+        if (newIds.has(el.dataset.id)) return;
+        const h = el.getBoundingClientRect().height;
+        el.style.height = h + 'px';
+        el.classList.add('qi-exit');
+        void el.offsetHeight;
+        requestAnimationFrame(() => {
+          el.classList.add('qi-exit-active');
+          el.style.height = '0px';
+        });
+        el.addEventListener('transitionend', () => el.remove(), { once: true });
+      });
+
+      const persistingIds = [];
+      items.forEach((item, i) => {
+        const id = String(item.id);
+        let el = existingById.get(id);
+        if (!el) {
+          el = buildQueueItem(item, i);
+          el.classList.add('qi-enter');
+        } else {
+          updateQueueItemContent(el, item, i);
+          persistingIds.push(id);
+        }
+        container.appendChild(el);
+      });
+
+      persistingIds.forEach((id) => {
+        const el = existingById.get(id);
+        const first = firstRects.get(id);
+        const last = el.getBoundingClientRect();
+        const deltaY = first.top - last.top;
+        if (Math.abs(deltaY) < 1) return;
+        el.style.transition = 'none';
+        el.style.transform = `translateY(${deltaY}px)`;
+        requestAnimationFrame(() => {
+          el.classList.add('qi-move');
+          el.style.transform = '';
+          el.addEventListener('transitionend', () => {
+            el.classList.remove('qi-move');
+            el.style.transition = '';
+          }, { once: true });
+        });
+      });
+
+      container.querySelectorAll('.qi-enter').forEach((el) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            el.classList.add('qi-enter-active');
+            el.addEventListener('transitionend', () => {
+              el.classList.remove('qi-enter', 'qi-enter-active');
+            }, { once: true });
+          });
+        });
+      });
+    }
+
     async function fetchQueue() {
       try {
         const response = await fetch('/radio/queue.json', { cache: 'no-store' });
@@ -1719,19 +2997,22 @@
         if (data.updated === queueLastUpdated) return;
         queueLastUpdated = data.updated;
         const items = data.queue || [];
+        lastQueueItems = items;
         if (!items.length) {
+          updateQueueList(queueList, items);
           queuePanel.classList.remove('visible');
           playerNextWrap.classList.remove('visible');
+          closeQueuePanel();
           fitMobilePlayerCover();
           return;
         }
-        queueList.innerHTML = '';
-        items.forEach((item, i) => queueList.appendChild(buildQueueItem(item, i)));
+        updateQueueList(queueList, items);
         queuePanel.classList.add('visible');
         const next = items[0];
         const nextTitle = next.title || 'Неизвестный трек';
         playerNextTrackEl.textContent = next.artist ? `${nextTitle} — ${next.artist}` : nextTitle;
         playerNextWrap.classList.add('visible');
+        if (playerQueuePanel.classList.contains('visible')) renderPlayerQueueList();
         // The "next up" row toggling on/off changes how much height the
         // non-cover rows take up, same as a title-wrap change above.
         fitMobilePlayerCover();
@@ -1756,6 +3037,55 @@
     }
     window.addEventListener('pagehide', stopRadioHard);
     window.addEventListener('beforeunload', stopRadioHard);
+
+    // Player hotkeys, same conventions as YouTube/Spotify so they feel
+    // familiar: Space play/pause, arrows for volume/seek, M to mute.
+    // Only real typing fields (input/textarea/select/contentEditable) skip
+    // the whole thing -- a *button* keeping focus after being clicked (e.g.
+    // the play button itself) must not disable every other hotkey, since
+    // focus commonly lingers there with nothing to move it away.
+    const TYPING_TAGS = ['INPUT', 'TEXTAREA', 'SELECT'];
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const active = document.activeElement;
+      if (active && (TYPING_TAGS.includes(active.tagName) || active.isContentEditable)) return;
+
+      if (e.code === 'Space' || e.key === ' ') {
+        // A focused <button> already toggles via its native space-activates-
+        // click behavior -- handling it here too would fire toggleRadio twice.
+        if (active && active.tagName === 'BUTTON') return;
+        e.preventDefault();
+        toggleRadio();
+        return;
+      }
+      if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        setVolume(Number(playerVolumeSlider.value) + 5);
+        return;
+      }
+      if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        setVolume(Number(playerVolumeSlider.value) - 5);
+        return;
+      }
+      if (e.code === 'ArrowLeft') {
+        if (!seekControlsAvailable) return;
+        e.preventDefault();
+        doRewind();
+        return;
+      }
+      if (e.code === 'ArrowRight') {
+        if (!seekControlsAvailable) return;
+        e.preventDefault();
+        doGoLive();
+        return;
+      }
+      if (e.code === 'KeyM') {
+        e.preventDefault();
+        toggleMute();
+        return;
+      }
+    });
   </script>
 </body>
 </html>

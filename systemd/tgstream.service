@@ -1,5 +1,5 @@
 [Unit]
-Description=Telegram RTMP broadcast for MusicmaniA channel
+Description=Telegram RTMP broadcast for radio channel
 After=network-online.target radio.service icecast2.service
 Wants=network-online.target
 

@@ -1,13 +1,13 @@
 [Unit]
-Description=Radio (Liquidsoap)
+Description=Radio Listener Count Publisher
 After=network-online.target icecast2.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/radio
-EnvironmentFile=/etc/musicbestman/env
-ExecStart=/usr/bin/liquidsoap /opt/radio/radio.liq
+EnvironmentFile=-/etc/musicbestman/env
+ExecStart=/opt/radio/venv/bin/python /opt/radio/publish_listeners.py
 Restart=on-failure
 RestartSec=5
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=MusicmaniA Radio Admin Panel (queue editing)
+Description=Radio Admin Panel (queue editing)
 After=network.target
 
 [Service]

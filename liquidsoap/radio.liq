@@ -42,7 +42,7 @@ end
 # playback, so give it generous headroom well above max_duration (600s, see
 # queue_filler.py) for the worst case of two long tracks back to back.
 radio = request.dynamic(timeout=1800., prefetch=2, next_request)
-radio = source.on_track(radio, on_new_track)
+radio.on_track(synchronous=true, on_new_track)
 radio = blank.skip(max_blank=15., min_noise=0.5, radio)
 radio = crossfade(duration=1.5, radio)
 # Explicit id so the admin panel can address it over the socket as
@@ -55,7 +55,7 @@ output.icecast(
   port=8000,
   password=icecast_password,
   mount="stream",
-  name="MusicmaniA Radio",
+  name="Your Radio",
   description="Hi-Fi, Lossless Audio, Музыка в высоком качестве",
   genre="Various",
   radio
@@ -80,7 +80,7 @@ output.icecast(
   port=8000,
   password=icecast_password,
   mount="stream.flac",
-  name="MusicmaniA Radio (Lossless)",
+  name="Your Radio (Lossless)",
   description="Lossless FLAC, Музыка в высоком качестве",
   genre="Various",
   radio

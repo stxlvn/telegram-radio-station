@@ -1,13 +1,13 @@
 [Unit]
-Description=Radio (Liquidsoap)
+Description=Radio ICY-metadata proxy for the FLAC/Ogg mount
 After=network-online.target icecast2.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/radio
-EnvironmentFile=/etc/musicbestman/env
-ExecStart=/usr/bin/liquidsoap /opt/radio/radio.liq
+EnvironmentFile=-/etc/musicbestman/env
+ExecStart=/opt/radio/venv/bin/python3 /opt/radio/icy_flac_proxy.py
 Restart=on-failure
 RestartSec=5
 

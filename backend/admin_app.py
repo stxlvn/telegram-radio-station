@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import json
+import re
 import uuid
 import socket
 
@@ -16,9 +17,9 @@ app.secret_key = os.urandom(24)
 # has no client_max_body_size override, causing a 413 for any real upload.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_proto=1, x_host=1)
 
-queue_dir = "/opt/radio/queue"
-playing_dir = "/opt/radio/cache"
-liquidsoap_socket = "/run/liquidsoap-radio.sock"
+queue_dir = os.environ.get("RADIO_QUEUE_DIR", "/opt/radio/queue")
+playing_dir = os.environ.get("RADIO_CACHE_DIR", "/opt/radio/cache")
+liquidsoap_socket = os.environ.get("LIQUIDSOAP_SOCKET_PATH", "/run/liquidsoap-radio.sock")
 app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024  # generous cap for a handful of lossless files at once
 
 ALLOWED_EXT = {".mp3", ".flac", ".m4a", ".ogg", ".wav", ".aac"}
@@ -197,6 +198,13 @@ PAGE_TEMPLATE = """
     border: none; cursor: pointer;
   }
   .item .reorder button:disabled { opacity: 0.25; cursor: not-allowed; }
+  .item .remove-btn {
+    width: 26px; height: 26px; margin: 0 0 0 6px; padding: 0; border-radius: 8px;
+    background: rgba(255,255,255,0.06); color: var(--on-surface-variant); font-size: 1rem;
+    border: none; cursor: pointer; flex-shrink: 0;
+  }
+  .item .remove-btn:hover { background: var(--primary-container); color: var(--primary); }
+  .locked .remove-btn { opacity: 1; }
   label { display: block; font-size: 0.85rem; color: var(--on-surface-variant); margin: 14px 0 6px; }
   input[type=file], select, input[type=text] {
     width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
@@ -257,9 +265,10 @@ PAGE_TEMPLATE = """
     <div id="cache-list">
       {% if cache_items %}
         {% for it in cache_items %}
-          <div class="item locked">
+          <div class="item locked" data-id="{{ it.id }}">
             <div class="num">{{ loop.index }}</div>
             <div class="txt"><div class="t">{{ it.title }}</div><div class="a">{{ it.artist }}</div></div>
+            <button type="button" class="remove-btn" data-location="cache" title="Удалить">&times;</button>
           </div>
         {% endfor %}
       {% else %}
@@ -280,6 +289,7 @@ PAGE_TEMPLATE = """
               <button type="button" class="move-up" {% if loop.first %}disabled{% endif %}>&#9650;</button>
               <button type="button" class="move-down" {% if loop.last %}disabled{% endif %}>&#9660;</button>
             </div>
+            <button type="button" class="remove-btn" data-location="queue" title="Удалить">&times;</button>
           </div>
         {% endfor %}
       {% else %}
@@ -327,6 +337,7 @@ PAGE_TEMPLATE = """
         container.innerHTML = '<div class="empty">Пусто</div>';
         return;
       }
+      const location = locked ? 'cache' : 'queue';
       container.innerHTML = items.map((it, i) => `
         <div class="item${locked ? ' locked' : ''}" data-id="${escapeHtml(it.id)}">
           <div class="num">${i + 1}</div>
@@ -336,6 +347,7 @@ PAGE_TEMPLATE = """
             <button type="button" class="move-up" ${i === 0 ? 'disabled' : ''}>&#9650;</button>
             <button type="button" class="move-down" ${i === items.length - 1 ? 'disabled' : ''}>&#9660;</button>
           </div>`}
+          <button type="button" class="remove-btn" data-location="${location}" title="Удалить">&times;</button>
         </div>
       `).join('');
     }
@@ -386,6 +398,38 @@ PAGE_TEMPLATE = """
         reordering = false;
       }
     });
+
+    let removing = false;
+    async function handleRemoveClick(e) {
+      const btn = e.target.closest('.remove-btn');
+      if (!btn || removing) return;
+      const item = btn.closest('.item');
+      const id = item.dataset.id;
+      const location = btn.dataset.location;
+      const title = item.querySelector('.t')?.textContent || '';
+      const warning = location === 'cache'
+        ? `Удалить «${title}»? Этот трек уже сейчас играет или вот-вот начнёт -- удаление файла может оборвать воспроизведение с щелчком/сбоем.`
+        : `Удалить «${title}» из очереди?`;
+      if (!confirm(warning)) return;
+      removing = true;
+      try {
+        const res = await fetch('remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, location }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'unknown error');
+        await refreshState();
+      } catch (err) {
+        console.error('Ошибка удаления:', err);
+        alert('Не удалось удалить трек: ' + err.message);
+      } finally {
+        removing = false;
+      }
+    }
+    queueList.addEventListener('click', handleRemoveClick);
+    cacheList.addEventListener('click', handleRemoveClick);
 
     async function refreshState() {
       try {
@@ -562,10 +606,42 @@ def reorder():
     return {"ok": True}
 
 
+TRACK_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+@app.route("/remove", methods=["POST"])
+def remove():
+    # Deliberately allowed for cache_items too, not just queue_items --
+    # those are only "locked" from *reordering* (their play order is
+    # already committed, imminent or in progress), which is a different
+    # thing from wanting one gone entirely. Removing the file out from
+    # under a track that's already mid-playback on Liquidsoap will glitch
+    # that one playback (there's no clean "abort this" primitive for
+    # anything past the current track, only .skip for the very first) --
+    # asked for explicitly, so it stays a deliberate, understood tradeoff
+    # rather than something to silently prevent.
+    data = request.get_json(silent=True) or {}
+    track_id = str(data.get("id", "")).strip()
+    location = data.get("location", "")
+    if location not in ("queue", "cache") or not track_id or not TRACK_ID_RE.match(track_id):
+        return {"ok": False, "error": "bad request"}, 400
+
+    target_dir = queue_dir if location == "queue" else playing_dir
+    removed = False
+    for suffix in (".audio", ".json", ".audio.part"):
+        path = os.path.join(target_dir, f"{track_id}{suffix}")
+        if os.path.exists(path):
+            os.remove(path)
+            removed = True
+    if not removed:
+        return {"ok": False, "error": "not found"}, 404
+    return {"ok": True}
+
+
 @app.route("/skip", methods=["POST"])
 def skip():
     try:
-        # Deliberately MusicmaniA_Radio.skip, not request.dynamic.flush_and_skip
+        # Deliberately output.icecast.skip, not request.dynamic.flush_and_skip
         # -- flush_and_skip's docs say exactly what they do: flush the whole
         # prefetch queue, not just skip the current track. That was silently
         # discarding anything else already prefetched, including
@@ -573,7 +649,12 @@ def skip():
         # count dropped after using it). Plain .skip only advances past the
         # current track and leaves everything else queued alone (confirmed:
         # cache file count unchanged after skip).
-        result = liquidsoap_command("MusicmaniA_Radio.skip")
+        #
+        # Command name changed on the Liquidsoap 2.4.5 upgrade -- the socket's
+        # auto-registered command namespace switched from a name-derived id
+        # ("MusicmaniA_Radio.skip") to the operator's own generic id
+        # (confirmed via the socket's own "help" listing post-upgrade).
+        result = liquidsoap_command("output.icecast.skip")
         return {"ok": True, "result": result.strip()}
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500

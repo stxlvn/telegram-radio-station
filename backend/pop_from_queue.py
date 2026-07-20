@@ -2,8 +2,8 @@ import json
 import os
 import sys
 
-queue_dir = "/opt/radio/queue"
-playing_dir = "/opt/radio/cache"
+queue_dir = os.environ.get("RADIO_QUEUE_DIR", "/opt/radio/queue")
+playing_dir = os.environ.get("RADIO_CACHE_DIR", "/opt/radio/cache")
 
 # NOTE: this script only ever ADDS files to playing_dir. It never deletes
 # anything from there, since we cannot know here whether Liquidsoap is still
@@ -39,6 +39,14 @@ def main():
 
     try:
         os.replace(src_audio, dst_audio)
+        # os.replace() keeps the original mtime (from whenever it was first
+        # downloaded into queue_dir, possibly a long wait ago now that the
+        # queue buffer runs deeper) -- admin_app.py and queue_list_writer.py
+        # both judge "stale, never actually played" by this file's age, so
+        # without resetting it here a track can look already-expired the
+        # moment it lands here and get hidden (or actually deleted by
+        # queue_list_writer.py) before it ever gets to play.
+        os.utime(dst_audio, None)
     except OSError as e:
         print(f"failed to move: {e}", file=sys.stderr)
         return

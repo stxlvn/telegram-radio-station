@@ -57,7 +57,7 @@ _progress_time_font = None
 _glow_bg = None
 _brand_avatar = None
 
-CHANNEL_NAME = "MusicmaniA"
+CHANNEL_NAME = os.environ.get("RADIO_STATION_NAME", "Your Radio")
 CHANNEL_HANDLE = "@" + os.environ.get("TELEGRAM_CHANNEL", "your_channel")
 CTA_TEXT = "ПОДПИСАТЬСЯ"
 
@@ -363,7 +363,7 @@ def render(artist, title, cover_local, queue=None, started_at=None, duration=Non
             dtw = draw.textlength(dt, font=progress_time_font)
             draw.text((bar_x0 + bar_w - dtw, time_y), dt, font=progress_time_font, fill=ON_SURFACE_VARIANT)
     else:
-        heading = "MusicmaniA Radio"
+        heading = CHANNEL_NAME + " Radio"
         hw = draw.textlength(heading, font=np_title_font)
         draw.text((now_card_x + now_card_w / 2 - hw / 2, ty), heading, font=np_title_font, fill=ON_SURFACE)
 

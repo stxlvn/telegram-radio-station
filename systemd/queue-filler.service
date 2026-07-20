@@ -1,5 +1,5 @@
 [Unit]
-Description=MusicmaniA Radio Queue Filler
+Description=Radio Queue Filler
 After=network-online.target
 Wants=network-online.target
 
