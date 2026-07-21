@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Your Radio</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+  <!-- Installability: an installed (home-screen) web app gets meaningfully
+       better background-execution treatment from both Android and iOS than
+       a plain browser tab -- see the install banner JS for why this radio
+       specifically cares about that. -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#171111">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Your Radio">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,400;8..144,500;8..144,700&family=Noto+Sans:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
@@ -322,6 +332,63 @@
       pointer-events: auto;
     }
     .snackbar svg { width: 20px; height: 20px; flex-shrink: 0; fill: var(--md-sys-color-tertiary); }
+
+    /* Same visual language as .snackbar (same fixed bottom slot, same dark
+       surface/shadow), but doesn't auto-hide -- this one needs an actual
+       decision (install, or dismiss), not just a glance. */
+    .install-banner {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(80px);
+      max-width: 90vw;
+      width: 400px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background-color: #3a2c2b;
+      color: var(--md-sys-color-on-surface);
+      padding: 16px 16px 16px 18px;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s var(--md-sys-motion-easing-emphasized),
+                  transform 0.25s var(--md-sys-motion-easing-emphasized);
+      z-index: 300;
+    }
+    .install-banner.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    .install-banner svg.install-banner-icon {
+      width: 22px; height: 22px; flex-shrink: 0; margin-top: 2px;
+      fill: var(--md-sys-color-tertiary);
+    }
+    .install-banner-body { flex: 1; min-width: 0; }
+    .install-banner-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; }
+    .install-banner-text { font-size: 0.82rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.4; }
+    .install-banner-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .install-banner-install {
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border: none; border-radius: 100px;
+      padding: 8px 16px; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .install-banner-dismiss {
+      background: none; color: var(--md-sys-color-on-surface-variant);
+      border: none; border-radius: 100px;
+      padding: 8px 12px; font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .install-banner-close {
+      flex-shrink: 0; width: 28px; height: 28px; border: none; border-radius: 50%;
+      background: none; color: var(--md-sys-color-on-surface-variant);
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .install-banner-close svg { width: 16px; height: 16px; fill: currentColor; }
 
     .volume-row {
       display: flex;
@@ -1534,6 +1601,22 @@
     <span>FLAC расходует в 6-8 раз больше трафика, чем MP3</span>
   </div>
 
+  <!-- Shown once, after playback actually starts (see maybeShowInstallBanner)
+       -- content/buttons filled in by JS since Android (real install prompt)
+       and iOS (Add to Home Screen has no programmatic trigger at all, just
+       instructions) need genuinely different bodies, not just different text. -->
+  <div id="install-banner" class="install-banner">
+    <svg class="install-banner-icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"></path></svg>
+    <div class="install-banner-body">
+      <div class="install-banner-title">Устойчивое фоновое воспроизведение</div>
+      <div id="install-banner-text" class="install-banner-text"></div>
+      <div id="install-banner-actions" class="install-banner-actions"></div>
+    </div>
+    <button type="button" id="install-banner-close" class="install-banner-close" title="Закрыть" aria-label="Закрыть">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+    </button>
+  </div>
+
   <!-- Body-level, not nested inside #player-inline -- that element's own
        transform (see the entrance-animation cleanup JS) makes it the
        containing block for any position:fixed descendant, and its
@@ -1744,6 +1827,109 @@
       clearTimeout(snackbarTimer);
       snackbarTimer = setTimeout(() => snackbar.classList.remove('visible'), 4000);
     }
+
+    // A plain browser tab -- even with a service worker registered -- is
+    // still subject to the same background-execution throttling that
+    // causes live playback to eventually die while the phone is locked or
+    // the app is switched away from (see the stall-watchdog comments
+    // above). An installed (home-screen) web app gets meaningfully looser
+    // treatment from both Android and iOS specifically because the OS
+    // then manages its lifecycle more like a real app's -- that's the
+    // actual fix, not anything a service worker does on its own. Register
+    // one anyway since a manifest + service worker pair is what makes the
+    // page installable in the first place.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+
+    const INSTALL_BANNER_DISMISSED_KEY = 'installBannerDismissed';
+    let deferredInstallPrompt = null;
+    // Chrome/Edge/Android only -- fired when the browser itself decides the
+    // page meets its installability criteria. Capturing it (instead of
+    // letting the browser show its own mini-infobar) is what lets our own
+    // banner's button trigger the real install prompt on demand, timed to
+    // when it's actually relevant (see maybeShowInstallBanner) rather than
+    // whenever Chrome happens to notice.
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+    });
+
+    function isRunningStandalone() {
+      return window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true; // iOS's own (non-standard) flag
+    }
+
+    function maybeShowInstallBanner() {
+      if (localStorage.getItem(INSTALL_BANNER_DISMISSED_KEY)) return;
+      if (isRunningStandalone()) return;
+      const ua = navigator.userAgent;
+      const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
+      const isAndroid = /Android/.test(ua);
+      // Desktop isn't the point here -- the background-death problem this
+      // exists for is a mobile-tab-throttling issue, installing on desktop
+      // wouldn't address anything a user actually asked about.
+      if (!isIOS && !isAndroid) return;
+      // Android: only worth showing once Chrome has actually confirmed
+      // installability by firing beforeinstallprompt -- without it there's
+      // no real button to offer, just a broken promise.
+      if (isAndroid && !deferredInstallPrompt) return;
+
+      const banner = document.getElementById('install-banner');
+      const textEl = document.getElementById('install-banner-text');
+      const actionsEl = document.getElementById('install-banner-actions');
+      actionsEl.innerHTML = '';
+
+      function dismiss() {
+        banner.classList.remove('visible');
+        localStorage.setItem(INSTALL_BANNER_DISMISSED_KEY, '1');
+      }
+
+      if (isIOS) {
+        textEl.textContent = 'На телефоне без установки браузер со временем '
+          + 'обрывает звук в фоне. Нажмите значок «Поделиться» ⎋ внизу экрана '
+          + 'и выберите «На экран «Домой»».';
+        const okBtn = document.createElement('button');
+        okBtn.type = 'button';
+        okBtn.className = 'install-banner-install';
+        okBtn.textContent = 'Понятно';
+        okBtn.addEventListener('click', dismiss);
+        actionsEl.appendChild(okBtn);
+      } else {
+        textEl.textContent = 'Без установки браузер со временем обрывает звук, '
+          + 'когда экран заблокирован. Установите приложение — фон станет стабильнее.';
+        const installBtn = document.createElement('button');
+        installBtn.type = 'button';
+        installBtn.className = 'install-banner-install';
+        installBtn.textContent = 'Установить';
+        installBtn.addEventListener('click', async () => {
+          dismiss();
+          if (!deferredInstallPrompt) return;
+          deferredInstallPrompt.prompt();
+          try { await deferredInstallPrompt.userChoice; } catch (e) {}
+          deferredInstallPrompt = null;
+        });
+        const laterBtn = document.createElement('button');
+        laterBtn.type = 'button';
+        laterBtn.className = 'install-banner-dismiss';
+        laterBtn.textContent = 'Не сейчас';
+        laterBtn.addEventListener('click', dismiss);
+        actionsEl.appendChild(installBtn);
+        actionsEl.appendChild(laterBtn);
+      }
+
+      document.getElementById('install-banner-close').addEventListener('click', dismiss, { once: true });
+      banner.classList.add('visible');
+    }
+    // Tied to actual playback starting, not page load -- showing this
+    // before someone has even pressed play has nothing to anchor the
+    // "background playback" pitch to, and would just read as a random
+    // interruption. once:true since maybeShowInstallBanner already no-ops
+    // after the first real decision (installed/dismissed), this just keeps
+    // it from re-registering the check on every reconnect too.
+    radioAudio.addEventListener('playing', () => maybeShowInstallBanner(), { once: true });
 
     // Plain target="_blank" still left the main page's fate tied to
     // whatever the popup ended up doing on some mobile browsers -- if the

@@ -111,6 +111,12 @@ Material Design 3 web player.
 - Live subscriber counter pulled from the Telegram channel
 - Full-screen cover view (proportions preserved, not cropped) with a
   translate-to-Russian option for non-Russian description text
+- Installable as a PWA (manifest + service worker) -- an installed app gets
+  meaningfully more background-execution leeway from both Android and iOS
+  than a plain browser tab, which the OS otherwise throttles into dropping
+  live playback after a while with the screen locked; a low-key banner with
+  an explanation and an install button (or instructions on iOS, which has
+  no programmatic install trigger at all) shows once after playback starts
 
 **Infrastructure**
 
