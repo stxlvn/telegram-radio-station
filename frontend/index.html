@@ -365,9 +365,18 @@
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .tab-fade-in { animation: tab-fade-in 0.25s var(--md-sys-motion-easing-emphasized-decelerate); }
+    /* !important -- .card-about/.card-broadcast (via .m3-card) and
+       #queue-panel (via .queue-panel) each already carry their own
+       page-load entrance animation at this same (single-class)
+       specificity, declared later in this stylesheet, so without this
+       their rule silently won the "animation" property outright instead
+       of this one -- same class of bug as every other !important already
+       in this file, confirmed directly this was the second reason (after
+       the inline style="animation:none" from clearEntranceAnimation) the
+       tab-switch fade never actually appeared. */
+    .tab-fade-in { animation: tab-fade-in 0.25s var(--md-sys-motion-easing-emphasized-decelerate) !important; }
     @media (prefers-reduced-motion: reduce) {
-      .tab-fade-in { animation: none; }
+      .tab-fade-in { animation: none !important; }
     }
 
     .m3-card {
@@ -717,7 +726,13 @@
          two elements at all: it's always in the top-right corner,
          full stop, regardless of whether its sibling is shown, hidden,
          or anything else changes about this row later. */
-      .top-bar { position: relative; justify-content: flex-start; }
+      /* min-height matching admin-link's own 36px -- confirmed directly
+         this was needed: taking it out of flex flow (below) means it no
+         longer contributes to .top-bar's height itself, so with the
+         title hidden (or just shorter than 36px) the bar collapsed down
+         to whatever line-height .top-bar-title's text needs, and "top:
+         50%" of THAT shrunken box landed noticeably higher than before. */
+      .top-bar { position: relative; justify-content: flex-start; min-height: 36px; }
       body[data-active-tab="radio"] .top-bar-title { display: block; }
       #admin-link {
         position: absolute;
@@ -3702,19 +3717,25 @@
           btn.classList.toggle('active', isActive);
           btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
-        // display:none -> flex/block (the [data-tab] !important rules)
-        // and adding the fade class were happening in the very same JS
-        // turn -- confirmed directly this meant no animation actually
-        // played, since the element was still technically display:none
-        // at the moment the class landed; a single synchronous reflow
-        // (offsetWidth) wasn't enough to guarantee the browser had
-        // genuinely committed the display change first. Two nested rAFs
-        // is the standard, more reliable fix: the first fires after the
-        // display change has actually been painted, the second guarantees
-        // that frame is fully committed before the animation class lands,
-        // so its 0% keyframe has a real "before" state to animate from.
+        // The real reason no animation ever played: clearEntranceAnimation
+        // (see the page-load stagger-in code above) sets `el.style.animation
+        // = 'none'` as an *inline* style on these same elements a moment
+        // after load, to drop the initial entrance animation's lingering
+        // transform. An inline style always wins over any class-based
+        // "animation" rule regardless of specificity -- so by the time
+        // anyone actually clicks a tab, .tab-fade-in's own animation was
+        // permanently locked out no matter how carefully its timing was
+        // handled. Clearing that inline value back out is what actually
+        // lets a class-based animation apply here again; the double rAF
+        // (still needed on top of that) makes sure the display:none ->
+        // flex/block change itself is genuinely painted before the
+        // animation class lands, so its 0% keyframe has a real "before"
+        // state to animate from.
         const targets = document.querySelectorAll('[data-tab="' + name + '"]');
-        targets.forEach((el) => el.classList.remove('tab-fade-in'));
+        targets.forEach((el) => {
+          el.classList.remove('tab-fade-in');
+          el.style.animation = '';
+        });
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             targets.forEach((el) => el.classList.add('tab-fade-in'));
