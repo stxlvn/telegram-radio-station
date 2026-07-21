@@ -709,8 +709,16 @@
       color: var(--md-sys-color-on-surface);
     }
     @media (max-width: 1024px) {
-      .top-bar { justify-content: space-between; align-items: center; }
+      .top-bar { align-items: center; }
       body[data-active-tab="radio"] .top-bar-title { display: block; }
+      /* margin-left: auto on the icon itself, not justify-content:
+         space-between on the container -- confirmed directly that broke
+         on "О канале" (where the title stays display:none): with only
+         one visible flex item, space-between has nothing to distribute
+         space "between", so it collapsed to the start of the row instead
+         of staying pinned right. auto-margin keeps admin-link flush
+         right regardless of whether the title next to it is shown at all. */
+      #admin-link { margin-left: auto; }
     }
 
     .player-meta-row {
@@ -1760,12 +1768,6 @@
 
   <div class="m3-card card-broadcast" data-tab="radio" id="card-broadcast">
     <div class="stagger-item delay-4">
-      <!-- Mobile only (see CSS) -- the "Радио" tab has nothing else naming
-           the station now that the channel-info card (with the real
-           title) lives in its own separate "О канале" tab. Desktop still
-           shows both cards side by side, so it'd just be a redundant
-           repeat of .card-about's own <h1> there. -->
-      <div class="radio-tab-title">Your Radio</div>
       <div class="on-air-label on-air-label-first">В эфире</div>
 
       <!-- Mobile: compact summary bar, tap to expand the full player below.
