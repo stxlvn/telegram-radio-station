@@ -116,7 +116,16 @@
       font-family: 'Product Sans', 'Roboto Flex', system-ui, sans-serif;
       background-color: var(--md-sys-color-background);
       color: var(--md-sys-color-on-surface);
-      min-height: 100vh;
+      /* dvh, not vh -- 100vh on mobile browsers uses the *largest*
+         possible viewport (as if the address bar/toolbar were always
+         hidden), which can genuinely be taller than what's on screen at
+         any given moment. body sizing itself to that larger figure would
+         make .layout's centering compute its "middle" against a box
+         taller than the visible area, landing visibly low/toward the
+         bottom of whatever's actually on screen even though it's
+         correctly centered within body's own (too-tall) box. dvh tracks
+         the real, current visual viewport instead. */
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       align-items: center;
