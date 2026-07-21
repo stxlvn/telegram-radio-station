@@ -709,16 +709,22 @@
       color: var(--md-sys-color-on-surface);
     }
     @media (max-width: 1024px) {
-      .top-bar { align-items: center; }
+      /* Both flex-based attempts (space-between, then an auto margin)
+         ended up entangled with whichever item happened to be visible --
+         confirmed directly, each fixed one tab and broke the other.
+         Taking admin-link out of flex flow entirely and pinning it with
+         plain absolute positioning removes any interaction between the
+         two elements at all: it's always in the top-right corner,
+         full stop, regardless of whether its sibling is shown, hidden,
+         or anything else changes about this row later. */
+      .top-bar { position: relative; justify-content: flex-start; }
       body[data-active-tab="radio"] .top-bar-title { display: block; }
-      /* margin-left: auto on the icon itself, not justify-content:
-         space-between on the container -- confirmed directly that broke
-         on "О канале" (where the title stays display:none): with only
-         one visible flex item, space-between has nothing to distribute
-         space "between", so it collapsed to the start of the row instead
-         of staying pinned right. auto-margin keeps admin-link flush
-         right regardless of whether the title next to it is shown at all. */
-      #admin-link { margin-left: auto; }
+      #admin-link {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+      }
     }
 
     .player-meta-row {
