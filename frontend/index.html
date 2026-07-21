@@ -83,13 +83,25 @@
     .ripple {
       position: absolute;
       border-radius: 50%;
-      background-color: rgba(255, 255, 255, 0.45);
+      /* 0.12 matches Material's own pressed-state-layer opacity (checked
+         directly against MDC's ripple implementation -- 0.45, then 0.2,
+         both still read as a flash rather than the real thing's much
+         subtler wash of light). */
+      background-color: rgba(255, 255, 255, 0.12);
       transform: scale(0);
-      animation: ripple-expand 0.5s ease-out;
+      animation: ripple-expand 0.4s ease-out;
       pointer-events: none;
     }
+    /* Holds through the first ~40% before fading rather than fading
+       continuously from the start -- MDC's own ripple grows at near-full
+       strength (225ms) before a separate, later fade-out (150ms) begins;
+       this approximates that same grow-then-fade shape in one keyframe
+       rather than needing to split it into two separately-triggered
+       animations for a press this brief. */
     @keyframes ripple-expand {
-      to { transform: scale(2.8); opacity: 0; }
+      0% { transform: scale(0); opacity: 1; }
+      40% { opacity: 1; }
+      100% { transform: scale(2.8); opacity: 0; }
     }
     @media (prefers-reduced-motion: reduce) {
       .ripple { display: none; }
@@ -676,12 +688,20 @@
        markup. */
     .radio-tab-title {
       display: none;
+      /* Same box (320px, centered as a block) and left alignment as
+         .on-air-label right below it, so the two share a left edge
+         instead of one being centered and the other flush-left. Same
+         color too (on-surface-variant, not the brighter on-surface an
+         <h1> would use) -- reads as part of the same small-label family
+         as "В ЭФИРЕ", not competing with it as a second, bigger heading. */
+      max-width: 320px;
+      width: 100%;
+      margin: 0 auto 18px;
       font-family: 'Product Sans', 'Roboto Flex', sans-serif;
       font-size: 1.4rem;
       font-weight: 700;
-      color: var(--md-sys-color-on-surface);
-      text-align: center;
-      margin-bottom: 4px;
+      color: var(--md-sys-color-on-surface-variant);
+      text-align: left;
     }
     @media (max-width: 1024px) {
       .radio-tab-title { display: block; }
@@ -778,17 +798,16 @@
       background-color: rgba(255, 255, 255, 0.08);
       color: var(--md-sys-color-on-surface);
     }
-    /* Primary accent for play/pause -- it's the main action here, worth
-       standing out more than a neutral fill. YouTube keeps its own brand
-       red, already established elsewhere as instantly recognizable on
-       its own. */
+    /* Primary accent for play/pause only -- it's the main action here,
+       worth standing out. YouTube's saturated brand red read as too loud
+       for a secondary action sitting right next to it -- toned down to
+       the same neutral fill every other secondary button on the page
+       uses (icon still reads as "YouTube" on its own; it doesn't need
+       the brand color to be identifiable given the label right next to
+       it now). */
     .np-playpause-btn {
       background-color: var(--md-sys-color-primary);
       color: var(--md-sys-color-on-primary);
-    }
-    .np-youtube-btn {
-      background-color: #FF0000;
-      color: #fff;
     }
     .np-playpause-btn svg, .np-youtube-btn svg { width: 22px; height: 22px; fill: currentColor; flex-shrink: 0; }
 
@@ -3687,29 +3706,54 @@
 
   <script>
     // Material ripple: tags the page's main tap targets with
-    // .ripple-target (see its CSS) and spawns an expanding circle
-    // centered on the actual tap point on every pointerdown, the same
-    // touch feedback Android's own Material components use. Delegated on
-    // document rather than one listener per element -- this also
-    // automatically covers the mini-player bar/nav items/etc. without
-    // needing to re-wire anything if they're ever re-rendered.
+    // .ripple-target (see its CSS) and spawns an expanding circle on
+    // pointerdown, the same touch feedback Android's own Material
+    // components use. Delegated on document rather than one listener per
+    // element -- this also automatically covers the mini-player bar/nav
+    // items/etc. without needing to re-wire anything if they're ever
+    // re-rendered.
     (function () {
-      const RIPPLE_SELECTOR = '.bottom-nav-item, .np-playpause-btn, .np-youtube-btn, ' +
+      const RIPPLE_SELECTOR = '.np-playpause-btn, .np-youtube-btn, ' +
         '.btn-telegram, .btn-radio, .quality-btn, .player-icon-btn, #now-playing';
       document.querySelectorAll(RIPPLE_SELECTOR).forEach((el) => el.classList.add('ripple-target'));
+      // Nav items get the ripple confined to just their icon-pill, not
+      // the whole (wide, short) touch target -- confirmed directly this
+      // was otherwise getting clipped unevenly into a lens/stadium shape
+      // by the item's own bounding box instead of a clean circle, since a
+      // circle sized to fit a wide-short rectangle doesn't actually fit
+      // its shorter dimension. Matches how a real M3 nav bar's own state
+      // layer is scoped to just that indicator, not the full item.
+      document.querySelectorAll('.bottom-nav-icon-pill').forEach((el) => el.classList.add('ripple-target'));
 
-      document.addEventListener('pointerdown', (e) => {
-        const target = e.target.closest(RIPPLE_SELECTOR);
-        if (!target) return;
-        const rect = target.getBoundingClientRect();
+      function spawnRipple(host, centerX, centerY) {
+        const rect = host.getBoundingClientRect();
         const size = Math.max(rect.width, rect.height);
         const ripple = document.createElement('span');
         ripple.className = 'ripple';
         ripple.style.width = ripple.style.height = size + 'px';
-        ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
-        ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
-        target.appendChild(ripple);
+        ripple.style.left = (centerX - rect.left - size / 2) + 'px';
+        ripple.style.top = (centerY - rect.top - size / 2) + 'px';
+        host.appendChild(ripple);
         ripple.addEventListener('animationend', () => ripple.remove());
+      }
+
+      document.addEventListener('pointerdown', (e) => {
+        const navItem = e.target.closest('.bottom-nav-item');
+        if (navItem) {
+          const pill = navItem.querySelector('.bottom-nav-icon-pill');
+          if (!pill) return;
+          // Centered on the pill itself, not the literal tap point -- a
+          // tap on the label (below the pill) would otherwise center the
+          // circle outside the pill's own box entirely, clipping away
+          // almost all of it. The whole item is still the tap target;
+          // only where the ripple visually lands is fixed.
+          const pillRect = pill.getBoundingClientRect();
+          spawnRipple(pill, pillRect.left + pillRect.width / 2, pillRect.top + pillRect.height / 2);
+          return;
+        }
+        const target = e.target.closest(RIPPLE_SELECTOR);
+        if (!target) return;
+        spawnRipple(target, e.clientX, e.clientY);
       });
     })();
   </script>
