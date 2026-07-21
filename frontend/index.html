@@ -731,6 +731,11 @@
          tight, so the collapsed mini-player had a couple hundred spare
          pixels sitting unused beside it. */
       .now-playing { max-width: 100%; }
+      /* Same 320px cap, same fix -- .on-air-label sits right above
+         .now-playing and is centered independently of it, so leaving this
+         one behind made its left edge visibly no longer line up with the
+         now-wider bar underneath it. */
+      .on-air-label { max-width: 100%; }
       .player-inline.expanded,
       .player-inline.closing {
         display: flex;
