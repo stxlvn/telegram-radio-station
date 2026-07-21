@@ -1988,6 +1988,8 @@
       if (radioAudio.paused) {
         userWantsPlayback = true;
         clearReconnectTimer();
+        ensureSilenceDetector();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         startPlayback();
         setPlayingUI(true);
         playerPlayPauseBtn.title = 'Загрузка...';
@@ -2072,13 +2074,78 @@
     function isPlaybackStalled() {
       return radioAudio.paused || (Date.now() - lastProgressAt >= currentStallThreshold());
     }
+
+    // Mobile browsers' native Ogg decoders can lose sync at the FLAC
+    // mount's live chained-stream header restart on a track change (the
+    // same restart icy_flac_proxy.py's own comment documents as
+    // intentional, relied on for per-track metadata) -- confirmed
+    // directly: playback goes fully silent right after a track change on
+    // mobile, currentTime keeps advancing throughout (so the timeupdate
+    // watchdog above never sees a gap and never recovers it), and only a
+    // manual reconnect brings sound back. FLAC-only: MP3 plays through
+    // hls.js/native HLS, whose AAC-in-TS segments never re-chain a logical
+    // stream mid-connection, so it doesn't hit this. A Web Audio
+    // AnalyserNode tap on the actual output is the only way to catch
+    // "decoding but silent" -- currentTime alone can't tell the two apart.
+    let audioCtx = null;
+    let silenceAnalyser = null;
+    let silenceData = null;
+    let silenceStreak = 0;
+    const SILENCE_RMS_THRESHOLD = 0.008; // nearly exact digital zero, not just "quiet" -- a soft passage still has real waveform variation
+    const SILENCE_TICKS_BEFORE_RECONNECT = 10; // 10 * 500ms = 5s, well past a track-boundary crossfade dip
+
+    function ensureSilenceDetector() {
+      if (audioCtx || !(window.AudioContext || window.webkitAudioContext)) return;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new Ctx();
+        const source = audioCtx.createMediaElementSource(radioAudio);
+        silenceAnalyser = audioCtx.createAnalyser();
+        silenceAnalyser.fftSize = 2048;
+        silenceData = new Uint8Array(silenceAnalyser.fftSize);
+        source.connect(silenceAnalyser);
+        silenceAnalyser.connect(audioCtx.destination);
+      } catch (err) {
+        // Best-effort extra layer -- if it can't be set up (older browser,
+        // restrictive permissions policy), playback itself is untouched.
+        console.warn('Silence detector unavailable:', err);
+        audioCtx = null;
+        silenceAnalyser = null;
+      }
+    }
+
+    function isAudiblySilent() {
+      if (!silenceAnalyser) return false;
+      silenceAnalyser.getByteTimeDomainData(silenceData);
+      let sumSquares = 0;
+      for (let i = 0; i < silenceData.length; i++) {
+        const deviation = (silenceData[i] - 128) / 128;
+        sumSquares += deviation * deviation;
+      }
+      return Math.sqrt(sumSquares / silenceData.length) < SILENCE_RMS_THRESHOLD;
+    }
+
     setInterval(() => {
       if (!userWantsPlayback || radioAudio.paused) {
         lastProgressAt = Date.now();
+        silenceStreak = 0;
         return;
       }
       if (isPlaybackStalled()) {
         scheduleReconnect('no timeupdate for ' + currentStallThreshold() + 'ms');
+        silenceStreak = 0;
+        return;
+      }
+      if (radioQuality === 'flac') {
+        if (isAudiblySilent()) {
+          silenceStreak++;
+          if (silenceStreak >= SILENCE_TICKS_BEFORE_RECONNECT) {
+            silenceStreak = 0;
+            scheduleReconnect('audibly silent for ' + (SILENCE_TICKS_BEFORE_RECONNECT * 500) + 'ms despite live timeupdate');
+          }
+        } else {
+          silenceStreak = 0;
+        }
       }
     }, 500);
 
@@ -2092,6 +2159,7 @@
     // right away rather than waiting for their next 5s poll tick.
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
       if (userWantsPlayback && isPlaybackStalled()) {
         scheduleReconnect('tab returned to foreground with stalled playback');
       }
