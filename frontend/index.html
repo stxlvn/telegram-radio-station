@@ -92,6 +92,11 @@
       animation: ripple-expand 0.4s ease-out;
       pointer-events: none;
     }
+    /* Slower here specifically, per request -- the pill is small enough
+       that the default duration read as too quick to actually notice. */
+    .bottom-nav-icon-pill .ripple {
+      animation-duration: 0.6s;
+    }
     /* Holds through the first ~40% before fading rather than fading
        continuously from the start -- MDC's own ripple grows at near-full
        strength (225ms) before a separate, later fade-out (150ms) begins;
@@ -220,6 +225,13 @@
          block, confirmed by actually reading it rather than assuming from
          its visual result. */
       body[data-active-tab="radio"] #queue-panel[data-tab="radio"] { display: flex !important; }
+      /* The admin-panel login icon lives in .top-bar, outside both tabs'
+         containers entirely, so nothing above ever touched it -- it kept
+         showing on "Радио" too. Per request, admin access belongs with
+         the channel-info tab only. .admin-link's own base rule already
+         sets display:flex, same specificity as a plain class selector
+         here, so !important again rather than relying on source order. */
+      body[data-active-tab="radio"] #admin-link { display: none !important; }
 
       /* Each tab already occupies its own dedicated screen now, so the
          .m3-card "card floating on the page" treatment (its own distinct
@@ -682,29 +694,23 @@
     }
     .on-air-label-first { margin-top: 0; }
 
-    /* Hidden by default (desktop) -- only earns its keep once the "О
-       канале" card (with the real <h1>) is off in its own separate tab.
-       See the mobile media query below and the HTML comment next to its
-       markup. */
-    .radio-tab-title {
+    /* Station-name title in the top bar, next to the admin-panel icon --
+       moved here from inside the player card (see git history): only
+       shown on mobile's "Радио" tab, which otherwise has nothing naming
+       the station once the branded card (with the real <h1>) is off in
+       its own separate "О канале" tab. Hidden there too, and on desktop,
+       where .card-about's own title is either in the other tab or (on
+       desktop) sitting right next to this one already. */
+    .top-bar-title {
       display: none;
-      /* Same box (320px, centered as a block) and left alignment as
-         .on-air-label right below it, so the two share a left edge
-         instead of one being centered and the other flush-left. Same
-         color too (on-surface-variant, not the brighter on-surface an
-         <h1> would use) -- reads as part of the same small-label family
-         as "В ЭФИРЕ", not competing with it as a second, bigger heading. */
-      max-width: 320px;
-      width: 100%;
-      margin: 0 auto 18px;
       font-family: 'Product Sans', 'Roboto Flex', sans-serif;
-      font-size: 1.4rem;
+      font-size: 1.1rem;
       font-weight: 700;
-      color: var(--md-sys-color-on-surface-variant);
-      text-align: left;
+      color: var(--md-sys-color-on-surface);
     }
     @media (max-width: 1024px) {
-      .radio-tab-title { display: block; }
+      .top-bar { justify-content: space-between; align-items: center; }
+      body[data-active-tab="radio"] .top-bar-title { display: block; }
     }
 
     .player-meta-row {
@@ -1707,6 +1713,7 @@
 </head>
 <body data-active-tab="radio">
   <div class="top-bar">
+    <div class="top-bar-title">Your Radio</div>
     <a href="/admin/" id="admin-link" class="admin-link" title="Панель администратора" aria-label="Панель администратора">
       <svg viewBox="0 0 24 24"><path d="M11 7l-1.41 1.41L12.17 11H2v2h10.17l-2.58 2.59L11 17l5-5zM20 3h-8v2h8v14h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
     </a>
@@ -3687,15 +3694,23 @@
           btn.classList.toggle('active', isActive);
           btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
-        // Removed then re-added (with a forced reflow in between) rather
-        // than just added -- a class alone wouldn't replay its animation
-        // on switching back to a tab that still had it from a previous
-        // visit, since nothing about the class actually changed from the
-        // browser's point of view.
-        document.querySelectorAll('[data-tab="' + name + '"]').forEach((el) => {
-          el.classList.remove('tab-fade-in');
-          void el.offsetWidth;
-          el.classList.add('tab-fade-in');
+        // display:none -> flex/block (the [data-tab] !important rules)
+        // and adding the fade class were happening in the very same JS
+        // turn -- confirmed directly this meant no animation actually
+        // played, since the element was still technically display:none
+        // at the moment the class landed; a single synchronous reflow
+        // (offsetWidth) wasn't enough to guarantee the browser had
+        // genuinely committed the display change first. Two nested rAFs
+        // is the standard, more reliable fix: the first fires after the
+        // display change has actually been painted, the second guarantees
+        // that frame is fully committed before the animation class lands,
+        // so its 0% keyframe has a real "before" state to animate from.
+        const targets = document.querySelectorAll('[data-tab="' + name + '"]');
+        targets.forEach((el) => el.classList.remove('tab-fade-in'));
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            targets.forEach((el) => el.classList.add('tab-fade-in'));
+          });
         });
       }
       buttons.forEach((btn) => {
