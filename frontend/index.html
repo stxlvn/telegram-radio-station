@@ -284,6 +284,17 @@
          cascade tie regardless of which rule "should" apply here. */
       .side-links { text-align: left !important; }
 
+      /* Centered instead of flush-start -- per request, the shorter tabs
+         (mostly "О канале" once its card content was tightened up to fit
+         one screen) were sitting stuck at the top with a large empty gap
+         below them down to the bottom-nav's own gradient fade, rather
+         than actually filling that space. Centering splits whatever's
+         left over evenly above/below instead. body's own min-height:100vh
+         plus the bottom-nav padding-reservation below already account for
+         the fixed bar, so the centering respects that boundary rather
+         than running underneath it. */
+      body { justify-content: safe center; }
+
       /* Reserve room for the fixed bar itself, on top of whatever the
          narrower-phone breakpoint further down already reserves for the
          notch/home-indicator -- declared after both existing body padding
