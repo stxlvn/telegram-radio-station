@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 import time
+import unicodedata
 import urllib.request
 import urllib.parse
 
@@ -137,6 +138,20 @@ def find_youtube_video_id(artist, title):
     return _find_youtube_video_id_via_api(artist, title) or _find_youtube_video_id_via_ytdlp(artist, title)
 
 
+def _strip_accents(text):
+    # Russian Wikipedia routinely marks stress with a combining acute
+    # accent (U+0301) on the lead word of an article -- "Ленингра́д", not
+    # "Ленинград" -- which silently breaks every plain substring check
+    # below: confirmed directly, the real "Ленинград" band article opens
+    # with "«Ленингра́д»" and a bare `"ленинград" in "ленингра́д"` check
+    # returns False despite being an exact match to a human eye, because
+    # the accent is a separate, invisible codepoint sitting between the
+    # "а" and "д". NFD splits every accented character into base+combining
+    # form, so filtering out the "Mn" (nonspacing mark) category strips
+    # exactly the accent marks and nothing else.
+    return "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
+
+
 def _looks_related(artist, candidate_text):
     # Discogs/Wikipedia search both always return *something* for a short
     # query, even for small independent artists with no real entry there
@@ -147,8 +162,8 @@ def _looks_related(artist, candidate_text):
     # meaningful word from it) actually shows up in what was found.
     if not artist:
         return True
-    artist_norm = artist.strip().lower()
-    candidate_norm = (candidate_text or "").lower()
+    artist_norm = _strip_accents(artist.strip().lower())
+    candidate_norm = _strip_accents((candidate_text or "").lower())
     if artist_norm and artist_norm in candidate_norm:
         return True
     # A multi-artist credit (comma/"feat."/"&"-joined) only needs ONE of
@@ -367,6 +382,57 @@ def fetch_discogs_description(resource_url):
 
 
 _QUOTED_NAME_RE = re.compile(r"«[^»]+»")
+_CYRILLIC_RE = re.compile(r"[а-яёА-ЯЁ]")
+
+
+def _quoted_spans(text):
+    return " ".join(_QUOTED_NAME_RE.findall(text or ""))
+
+
+def _looks_related_in_extract(name, extract):
+    # A plain substring hit anywhere in the extract is too easy to satisfy
+    # by accident for a Cyrillic name -- confirmed directly: the band
+    # "Ленинград" fuzzy-matched the Saint Petersburg Wikipedia article,
+    # passing only via "...Ленинградской областью..." ("Leningrad Oblast",
+    # an unrelated neighboring administrative region) -- "Ленинград" is
+    # simply a case-inflection prefix of that region's own name, nothing to
+    # do with the band. The article's own title ("Санкт-Петербург") never
+    # matched at all, so this was the *only* signal that passed for an
+    # article that isn't about the artist in any sense. Russian
+    # orthographic convention puts a musical group's (or song's) own name
+    # in «guillemets» specifically to set it apart from an ordinary word or
+    # place name -- confirmed against the real band's own article, which
+    # opens "«Ленингра́д» ... российская музыкальная группа" exactly this
+    # way. Require that instead of a bare substring hit, but only for
+    # Cyrillic names: Latin-script artist names aren't conventionally
+    # quoted like this in Russian prose, so the plain check still applies
+    # to them, where this kind of common-word/toponym collision doesn't
+    # arise in the first place.
+    if _is_cyrillic(name):
+        return _looks_related(name, _quoted_spans(extract))
+    return _looks_related(name, extract)
+
+
+def _is_cyrillic(text):
+    return bool(_CYRILLIC_RE.search(text or ""))
+
+
+def _trim_to_boundary(text, limit):
+    # A hard slice at a fixed character count cuts mid-word/mid-sentence
+    # about as often as not (confirmed directly on a real description that
+    # landed exactly on the 2000-char mark, ending "...до 2030 года»
+    # предпо"). Prefer the last full sentence within the limit; if none
+    # exists (a long sentence with no period in the first `limit` chars),
+    # fall back to the last full word instead of chopping one in half.
+    if len(text) <= limit:
+        return text
+    window = text[:limit]
+    for stop in (". ", "! ", "? "):
+        idx = window.rfind(stop)
+        if idx != -1:
+            return window[: idx + 1].rstrip()
+    idx = window.rfind(" ")
+    return (window[:idx] if idx != -1 else window).rstrip() + "…"
 
 
 def _wikipedia_lookup(lang, query_text, artist="", title=""):
@@ -376,9 +442,17 @@ def _wikipedia_lookup(lang, query_text, artist="", title=""):
     # then pull the plain-text intro of whatever it finds.
     headers = {"User-Agent": "MusicmaniaRadio/1.0"}
     try:
+        # srlimit=5, not 1 -- a plain-word artist name can rank an
+        # unrelated, more-linked article above its own (confirmed directly:
+        # "Ленинград" the band's own article is titled "Ленинград
+        # (группа)", but a bare "Ленинград" search ranks the Saint
+        # Petersburg city article -- itself formerly named "Ленинград" --
+        # ahead of it). Only taking the top hit meant that once it failed
+        # the relatedness checks below, the search gave up entirely instead
+        # of trying the next, actually-correct candidate.
         search_url = (
             f"https://{lang}.wikipedia.org/w/api.php?action=query&format=json"
-            "&list=search&srlimit=1&srsearch=" + urllib.parse.quote(query_text)
+            "&list=search&srlimit=5&srsearch=" + urllib.parse.quote(query_text)
         )
         req = urllib.request.Request(search_url, headers=headers)
         with urllib.request.urlopen(req, timeout=6) as resp:
@@ -386,87 +460,96 @@ def _wikipedia_lookup(lang, query_text, artist="", title=""):
         results = (search_data.get("query") or {}).get("search") or []
         if not results:
             return ""
-        page_id = results[0]["pageid"]
+        page_ids = [str(r["pageid"]) for r in results]
         extract_url = (
             f"https://{lang}.wikipedia.org/w/api.php?action=query&format=json"
-            f"&prop=extracts&exintro=1&explaintext=1&pageids={page_id}"
+            f"&prop=extracts&exintro=1&explaintext=1&pageids={'|'.join(page_ids)}"
         )
         req2 = urllib.request.Request(extract_url, headers=headers)
         with urllib.request.urlopen(req2, timeout=6) as resp2:
             extract_data = json.loads(resp2.read().decode("utf-8"))
-        pages = (extract_data.get("query") or {}).get("pages") or {}
-        page = next(iter(pages.values()), {})
-        extract = (page.get("extract") or "").strip()[:2000]
-        # Wikipedia's disambiguation pages ("Mako may refer to:" / russian
-        # "Название может означать:") are a search hit like any other
-        # article -- they just list unrelated things sharing a word, not a
-        # description of anything. Confirmed directly this needed to search
-        # the whole extract, not just its first 40 characters: "Альянс" (a
-        # real Soviet/Russian band) matched an article that opens with the
-        # ordinary dictionary definition of "альянс" the common noun
-        # ("союз, объединение... договорных обязательств") for ~150
-        # characters *before* getting to "Также может означать:" -- still
-        # not actually about the band, just further into the text than the
-        # position check allowed. The trailing colon is what actually makes
-        # this phrase distinctive (a normal sentence essentially never uses
-        # it), so anchoring on that instead of position is both safer and
-        # catches this case.
-        if re.search(r"\b(may refer to|может означать)\s*:", extract, re.IGNORECASE):
-            return ""
-        # Same idea, for a different class of false match: rural locality
-        # stub articles (thousands of them, all near-identical copy, in
-        # both the English and Russian Wikipedias) share a name with
-        # plenty of bands/artists purely by coincidence -- confirmed
-        # directly on the English side: the band "The Вепри" has no
-        # article of its own, so the artist-only fallback query (no track
-        # title left to cross-check against, see below) matched the
-        # village "Вепри, Vologda Oblast" instead: "The" trivially appears
-        # in any English prose and "Вепри" is the village's own name, so
-        # the artist-relatedness check right below this passed despite
-        # being a completely unrelated place. These template phrases ("is
-        # a rural locality ... Oblast, Russia. The population was N as of
-        # YYYY" / "— (деревня|село|посёлок) в ... районе") are distinctive
-        # enough to reject outright -- they never legitimately describe a
-        # musician.
-        if re.search(r"\bis a rural locality\b", extract, re.IGNORECASE):
-            return ""
-        if re.search(r"—\s*(деревня|село|посёлок|хутор)\b.{0,60}\bрайон", extract, re.IGNORECASE):
-            return ""
-        # Accept if the artist shows up in either the matched article's own
-        # title or its text -- a real article about the track/artist will
-        # have one or the other, an unrelated fuzzy-search hit will have
-        # neither.
-        article_title = results[0].get("title", "")
-        artist_matches_own_title = _looks_related(artist, article_title)
-        if not (artist_matches_own_title or _looks_related(artist, extract)):
-            return ""
-        # Same guard, but for the specific track title -- confirmed directly
-        # this was missing and caused a real mismatch: searching "Robbie
-        # Williams By All Means Necessary" (a deep album cut with no article
-        # of its own) fuzzy-matched the "Let Me Entertain You" single's page
-        # instead. That page passed the artist check above (same artist!)
-        # but described a completely different song. Only checked when a
-        # title was actually given -- the artist-only fallback call below
-        # has no specific song to verify against.
-        title_matches_own_title = _looks_related(title, article_title) if title else False
-        if title and not (title_matches_own_title or _looks_related(title, extract)):
-            return ""
-        # Neither check matched the article's own title -- both artist and
-        # title relied entirely on scattered mentions somewhere in the
-        # extract, which is weak once that extract is a long list of
-        # names. Confirmed directly: "АлисА Шанс" surfaced "Рыженко,
-        # Сергей Ильич" (an unrelated session musician), matching "Алиса"
-        # only because it's one of many bands in a "recorded with..."
-        # enumeration, and "Шанс" only via an unrelated band called
-        # "Последний шанс" mentioned nearby -- the article is about
-        # neither the artist nor the track, just a person who happened to
-        # brush past both names in a long career summary. A bio like that
-        # reads as a dense run of quoted proper nouns; a real song/artist
-        # article essentially never does.
-        if title and not artist_matches_own_title and not title_matches_own_title:
-            if len(_QUOTED_NAME_RE.findall(extract)) >= 5:
-                return ""
-        return extract
+        pages_by_id = (extract_data.get("query") or {}).get("pages") or {}
+
+        for result in results:
+            page = pages_by_id.get(str(result["pageid"])) or {}
+            extract = (page.get("extract") or "").strip()
+            if not extract:
+                continue
+            # Wikipedia's disambiguation pages ("Mako may refer to:" /
+            # russian "Название может означать:") are a search hit like
+            # any other article -- they just list unrelated things sharing
+            # a word, not a description of anything. Confirmed directly
+            # this needed to search the whole extract, not just its first
+            # 40 characters: "Альянс" (a real Soviet/Russian band) matched
+            # an article that opens with the ordinary dictionary
+            # definition of "альянс" the common noun ("союз, объединение...
+            # договорных обязательств") for ~150 characters *before*
+            # getting to "Также может означать:" -- still not actually
+            # about the band, just further into the text than the position
+            # check allowed. The trailing colon is what actually makes
+            # this phrase distinctive (a normal sentence essentially never
+            # uses it), so anchoring on that instead of position is both
+            # safer and catches this case.
+            if re.search(r"\b(may refer to|может означать)\s*:", extract, re.IGNORECASE):
+                continue
+            # Same idea, for a different class of false match: rural
+            # locality stub articles (thousands of them, all near-identical
+            # copy, in both the English and Russian Wikipedias) share a
+            # name with plenty of bands/artists purely by coincidence --
+            # confirmed directly on the English side: the band "The Вепри"
+            # has no article of its own, so the artist-only fallback query
+            # (no track title left to cross-check against, see below)
+            # matched the village "Вепри, Vologda Oblast" instead: "The"
+            # trivially appears in any English prose and "Вепри" is the
+            # village's own name, so the artist-relatedness check right
+            # below this passed despite being a completely unrelated
+            # place. These template phrases ("is a rural locality ...
+            # Oblast, Russia. The population was N as of YYYY" / "—
+            # (деревня|село|посёлок) в ... районе") are distinctive enough
+            # to reject outright -- they never legitimately describe a
+            # musician.
+            if re.search(r"\bis a rural locality\b", extract, re.IGNORECASE):
+                continue
+            if re.search(r"—\s*(деревня|село|посёлок|хутор)\b.{0,60}\bрайон", extract, re.IGNORECASE):
+                continue
+            # Accept if the artist shows up in either the matched article's
+            # own title or its text -- a real article about the
+            # track/artist will have one or the other, an unrelated
+            # fuzzy-search hit will have neither.
+            article_title = result.get("title", "")
+            artist_matches_own_title = _looks_related(artist, article_title)
+            if not (artist_matches_own_title or _looks_related_in_extract(artist, extract)):
+                continue
+            # Same guard, but for the specific track title -- confirmed
+            # directly this was missing and caused a real mismatch:
+            # searching "Robbie Williams By All Means Necessary" (a deep
+            # album cut with no article of its own) fuzzy-matched the "Let
+            # Me Entertain You" single's page instead. That page passed
+            # the artist check above (same artist!) but described a
+            # completely different song. Only checked when a title was
+            # actually given -- the artist-only fallback call below has no
+            # specific song to verify against.
+            title_matches_own_title = _looks_related(title, article_title) if title else False
+            if title and not (title_matches_own_title or _looks_related_in_extract(title, extract)):
+                continue
+            # Neither check matched the article's own title -- both artist
+            # and title relied entirely on scattered mentions somewhere in
+            # the extract, which is weak once that extract is a long list
+            # of names. Confirmed directly: "АлисА Шанс" surfaced
+            # "Рыженко, Сергей Ильич" (an unrelated session musician),
+            # matching "Алиса" only because it's one of many bands in a
+            # "recorded with..." enumeration, and "Шанс" only via an
+            # unrelated band called "Последний шанс" mentioned nearby --
+            # the article is about neither the artist nor the track, just
+            # a person who happened to brush past both names in a long
+            # career summary. A bio like that reads as a dense run of
+            # quoted proper nouns; a real song/artist article essentially
+            # never does.
+            if title and not artist_matches_own_title and not title_matches_own_title:
+                if len(_QUOTED_NAME_RE.findall(extract)) >= 5:
+                    continue
+            return _trim_to_boundary(extract, 2000)
+        return ""
     except Exception as e:
         print(f"wikipedia lookup failed ({lang}): {e}", file=sys.stderr)
         return ""
