@@ -1641,6 +1641,14 @@
       .side-links { margin-top: 10px; }
     }
 
+    /* Extra gap for the copy of .side-links sitting right under the
+       play/YouTube buttons -- pushed further down from them than the
+       plain 10px above gives, per request, without relocating it under
+       the queue list entirely (a separate attempt at "lower" that turned
+       out not to be what was meant). Declared after the mobile override
+       right above so it wins that tie regardless of viewport width. */
+    .side-links-lower { margin-top: 28px; }
+
     /* Desktop: the player is always shown expanded inline in the card, no
        tap-to-expand -- hide the compact trigger bar and its collapse
        button, and force .player-inline visible regardless of .expanded. */
@@ -1835,7 +1843,7 @@
         </a>
       </div>
 
-      <div class="side-links stagger-item delay-4">
+      <div class="side-links side-links-lower stagger-item delay-4">
         <a href="/radio/stream" target="_blank">MP3-поток</a>
         <span class="side-links-dot">·</span>
         <a href="/playlist.m3u" download>M3U</a>
