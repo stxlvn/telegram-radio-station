@@ -2097,15 +2097,43 @@
     // the time-based watchdog below is the whole mechanism again, same as
     // before that attempt. The rare desync case goes back to needing a
     // manual reconnect.
-    setInterval(() => {
+    function checkStallAndReconnect(reasonSuffix) {
       if (!userWantsPlayback || radioAudio.paused) {
         lastProgressAt = Date.now();
         return;
       }
       if (isPlaybackStalled()) {
-        scheduleReconnect('no timeupdate for ' + currentStallThreshold() + 'ms');
+        scheduleReconnect('no timeupdate for ' + currentStallThreshold() + 'ms' + (reasonSuffix || ''));
       }
-    }, 500);
+    }
+    setInterval(() => checkStallAndReconnect(), 500);
+
+    // Chrome/Safari both throttle a backgrounded tab's own setInterval
+    // heavily (down to roughly once a minute or less after a few minutes
+    // hidden, sometimes stopping altogether) -- confirmed as the actual
+    // cause of a real report: audio would play in the background for a
+    // while, then go dead, only recovering once the app was reopened
+    // (i.e. only the visibilitychange handler below was ever catching it,
+    // never the interval itself while still backgrounded). A dedicated
+    // Worker's own timers aren't throttled by page visibility the same
+    // way, so running the same stall check from one lets a background
+    // connection death recover on its own, the way a real background-audio
+    // app is expected to behave, instead of needing the user to physically
+    // reopen the tab first. Built inline via a Blob URL -- one tiny script,
+    // not worth a separate file. Purely additive: if construction fails for
+    // any reason (unsupported, blocked by a strict CSP), the interval above
+    // and the visibilitychange catch-up below still cover exactly what they
+    // did before this existed.
+    try {
+      const heartbeatBlob = new Blob(
+        ['setInterval(() => postMessage(1), 1000);'],
+        { type: 'application/javascript' }
+      );
+      const heartbeatWorker = new Worker(URL.createObjectURL(heartbeatBlob));
+      heartbeatWorker.onmessage = () => checkStallAndReconnect(', background heartbeat');
+    } catch (err) {
+      console.warn('Background heartbeat worker unavailable:', err);
+    }
 
     // Mobile browsers can silently suspend the stream connection while the
     // tab is backgrounded (screen lock, switching apps) without ever firing
