@@ -99,6 +99,10 @@ Material Design 3 web player.
 - Responsive layout: three-card desktop view (channel info, live player,
   queue) that collapses into a full-screen mobile player on tap, with a
   dedicated side-by-side layout on short/landscape phone screens
+- Mobile gets a Material Design 3 bottom tab bar ("Radio" for the player +
+  queue, "About" for the channel info) instead of one long scroll through
+  everything -- not needed on desktop, where it all already sits side by
+  side
 - Synced progress bar anchored to server time, immune to buffering
   hiccups, with automatic reconnect if the connection drops -- including
   compensating the on-screen track change for the HLS player's own

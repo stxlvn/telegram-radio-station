@@ -44,12 +44,56 @@
       --md-sys-color-on-primary: #68000A;
       --md-sys-color-primary-container: #930012;
       --md-sys-color-tertiary: #FFD27A;
+      /* Not part of the original palette -- added specifically for the
+         bottom nav bar's active-item indicator. M3's own nav bar spec
+         calls for secondary-container there deliberately, not primary:
+         primary-container is already the loud, attention-grabbing tone
+         used for placeholder art fills elsewhere on the page, too heavy
+         for something that sits selected on screen at all times. A muted
+         rose sitting between --surface-container and --primary-container
+         in both darkness and saturation keeps it in the same warm family
+         without competing with primary. */
+      --md-sys-color-secondary-container: #4A3335;
+      --md-sys-color-on-secondary-container: #E8C3C5;
       --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
       --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
       --md-sys-motion-duration-long2: 500ms;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* Chrome/Android's own default tap feedback -- a flat gray rectangle
+       snapping on and off -- reads as a generic web page, not an app.
+       Removed everywhere a real Material ripple (see .ripple-target
+       below) replaces it instead. */
+    button, a, [role="button"], [role="tab"] {
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Material-style ripple: an expanding, fading circle centered on
+       wherever the tap actually landed, the same touch feedback
+       Android's own Material components use -- see the pointerdown
+       listener that spawns .ripple spans inside these on tap. overflow:
+       hidden clips it to each element's own shape (pill/circle/rounded
+       rect), position:relative anchors the span's absolute coordinates
+       to the element itself rather than the page. */
+    .ripple-target {
+      position: relative;
+      overflow: hidden;
+    }
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.45);
+      transform: scale(0);
+      animation: ripple-expand 0.5s ease-out;
+      pointer-events: none;
+    }
+    @keyframes ripple-expand {
+      to { transform: scale(2.8); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ripple { display: none; }
+    }
 
     body {
       font-family: 'Product Sans', 'Roboto Flex', system-ui, sans-serif;
@@ -127,6 +171,157 @@
       .main-cards { flex-direction: column; align-items: center; }
     }
 
+    /* Bottom tab navigation -- mobile only. Desktop already shows the
+       channel-info card and the player/queue side by side with nothing
+       fighting for scroll space, so there's no "too much on one page"
+       problem there to solve; splitting it into tabs there would just be
+       churn for its own sake. On mobile, before this, all three pieces
+       (about card, player card, queue panel) stacked in one long scroll --
+       this instead groups them under "Радио" (player + queue, since a
+       listener came for one or the other, not a hard split between them)
+       and "О канале" (the channel-info card), tab-switched with the
+       actual <audio> element untouched either way since nothing here is a
+       real navigation, just a display:none toggle on two groups of DOM
+       that were already both present.
+       Follows M3's own Navigation Bar spec rather than inventing a bespoke
+       tab bar, since the rest of the page already commits to the M3 token
+       system: fixed 80px bar, active item gets a pill-shaped
+       secondary-container indicator behind the icon, inactive items sit in
+       on-surface-variant. */
+    @media (max-width: 1024px) {
+      /* !important on both sides of this toggle, not just the hide --
+         confirmed directly this was otherwise silently losing the
+         cascade: .card-about and .queue-panel each set their own
+         unconditional "display: flex" later in this same stylesheet
+         (source order below this block), and an attribute selector like
+         [data-tab] ties with a plain class selector on specificity, so
+         whichever rule is written LATER wins regardless of which one
+         "sounds" more specific to a human reader. Without !important both
+         cards ended up permanently visible together, tab or no tab --
+         matches #video-toggle-row's existing use of !important further
+         down for the same kind of "must beat a component's own later
+         display rule" problem. */
+      [data-tab] { display: none !important; }
+      body[data-active-tab="about"] .card-about[data-tab="about"] { display: flex !important; }
+      body[data-active-tab="radio"] .card-broadcast[data-tab="radio"] { display: block !important; }
+      /* .queue-panel's own base rule is display:flex (column) -- not
+         block, confirmed by actually reading it rather than assuming from
+         its visual result. */
+      body[data-active-tab="radio"] #queue-panel[data-tab="radio"] { display: flex !important; }
+
+      /* Each tab already occupies its own dedicated screen now, so the
+         .m3-card "card floating on the page" treatment (its own distinct
+         surface-container background/padding-box, meant to visually
+         separate it from siblings sitting right next to or below it) has
+         nothing left to separate itself from on mobile -- removed there
+         so content sits directly on the page background instead of a
+         redundant nested box. Desktop keeps the real card look (untouched
+         here, outside this breakpoint) since both cards + the queue still
+         sit side by side and need that separation.
+         !important again, same reason as the toggle rules above: .m3-card
+         itself sets background-color/padding/border-radius later in this
+         stylesheet (line ~234) at equal (single-class) specificity, so
+         without it that later rule silently won and the "card" look never
+         actually went away -- confirmed directly, this was still showing
+         after the first attempt. */
+      .card-about, .card-broadcast {
+        background-color: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+
+      /* "О канале" is now its own dedicated tab/screen rather than one
+         card sharing a page with the player -- tightened spacing (not
+         content: the subscribe button stays, per request) so the whole
+         thing has a real shot at fitting one phone screen without
+         scrolling, same spirit as removing the card backdrop above. */
+      .card-about .avatar-container { width: 88px; height: 88px; margin: 0 auto 12px; }
+      .card-about h1 { font-size: clamp(1.4rem, 7vw, 2rem); margin-bottom: 4px; }
+      .card-about .subtitle { margin-bottom: 10px; }
+      .card-about .stats-badge { margin: 0 0 14px; padding: 6px 16px; }
+      .card-about .feature-list { gap: 8px; margin-bottom: 14px; }
+      .card-about .feature-icon { width: 34px; height: 34px; }
+
+      /* Reserve room for the fixed bar itself, on top of whatever the
+         narrower-phone breakpoint further down already reserves for the
+         notch/home-indicator -- declared after both existing body padding
+         rules (source order, same specificity) so it always wins on the
+         one property it touches instead of getting clobbered by the
+         420px breakpoint's own full padding shorthand. */
+      body { padding-bottom: calc(24px + 64px + env(safe-area-inset-bottom)); }
+    }
+    @media (max-width: 420px) {
+      body { padding-bottom: calc(16px + 64px + env(safe-area-inset-bottom)); }
+    }
+
+    .bottom-nav {
+      display: none;
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 250; /* below the fullscreen player overlay (300), so expanding it naturally covers this instead of needing extra coordination */
+      /* Translucent + blurred (frosted glass) instead of a flat opaque
+         fill, per request -- lets a hint of whatever's scrolled
+         underneath show through instead of a hard-edged solid bar.
+         -webkit- prefix still required for Safari/iOS. No box-shadow --
+         a hard shadow line was exactly the "abrupt cutoff" against the
+         page content this was meant to soften in the first place; the
+         ::before gradient below does that job instead. */
+      background-color: rgba(37, 27, 26, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    /* Fades the page content into the bar's own translucent color over a
+       short span instead of ending sharply right at its top edge --
+       sits just above the bar (bottom: 100%), same color, no hard line. */
+    .bottom-nav::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      bottom: 100%;
+      height: 28px;
+      background: linear-gradient(to bottom, transparent, rgba(37, 27, 26, 0.75));
+      pointer-events: none;
+    }
+    @media (max-width: 1024px) {
+      .bottom-nav { display: flex; }
+    }
+    .bottom-nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      /* Shorter than M3's own reference 80dp -- confirmed directly that
+         read as too tall/heavy for how little this bar actually needs to
+         hold (2 items, no badges). 64px keeps a comfortable touch target
+         while sitting noticeably lower on screen. */
+      height: 64px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant);
+      font-family: inherit;
+    }
+    .bottom-nav-icon-pill {
+      width: 64px;
+      height: 32px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s var(--md-sys-motion-easing-emphasized);
+    }
+    .bottom-nav-item.active .bottom-nav-icon-pill {
+      background-color: var(--md-sys-color-secondary-container);
+    }
+    .bottom-nav-item.active .bottom-nav-icon-pill svg { fill: var(--md-sys-color-on-secondary-container); }
+    .bottom-nav-icon-pill svg { width: 24px; height: 24px; fill: var(--md-sys-color-on-surface-variant); }
+    .bottom-nav-label { font-size: 0.75rem; font-weight: 500; }
+    .bottom-nav-item.active .bottom-nav-label { color: var(--md-sys-color-on-surface); font-weight: 600; }
+
     @keyframes m3-card-enter {
       from { opacity: 0; transform: scale(0.95) translateY(20px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
@@ -135,6 +330,20 @@
     @keyframes m3-stagger-enter {
       from { opacity: 0; transform: translateY(16px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Bottom-nav tab switch: display:none/flex toggling on its own is an
+       instant, un-animatable jump -- this fades + slides the newly shown
+       tab's content in right after, applied/removed by switchTab() below
+       rather than left running permanently (a plain class would only
+       play once, on first page load, not on every later switch). */
+    @keyframes tab-fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tab-fade-in { animation: tab-fade-in 0.25s var(--md-sys-motion-easing-emphasized-decelerate); }
+    @media (prefers-reduced-motion: reduce) {
+      .tab-fade-in { animation: none; }
     }
 
     .m3-card {
@@ -317,6 +526,15 @@
     }
     .side-links-dot { margin: 0 6px; color: var(--md-sys-color-on-surface-variant); opacity: 0.5; }
 
+    /* Separates the stream links from the queue list above them now that
+       both live in #queue-panel together -- a plain color change or
+       spacing alone left them reading as one continuous list. */
+    .queue-divider {
+      border: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      margin: 20px 0 4px;
+    }
+
     .snackbar {
       position: fixed;
       left: 50%;
@@ -452,6 +670,23 @@
     }
     .on-air-label-first { margin-top: 0; }
 
+    /* Hidden by default (desktop) -- only earns its keep once the "О
+       канале" card (with the real <h1>) is off in its own separate tab.
+       See the mobile media query below and the HTML comment next to its
+       markup. */
+    .radio-tab-title {
+      display: none;
+      font-family: 'Product Sans', 'Roboto Flex', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--md-sys-color-on-surface);
+      text-align: center;
+      margin-bottom: 4px;
+    }
+    @media (max-width: 1024px) {
+      .radio-tab-title { display: block; }
+    }
+
     .player-meta-row {
       display: flex;
       align-items: center;
@@ -511,38 +746,51 @@
     }
     .now-playing .np-title { font-size: 0.9rem; font-weight: 600; color: var(--md-sys-color-on-surface); }
     .now-playing .np-artist { font-size: 0.8rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 6px; }
-    /* Controls on the compact mini-player itself -- play/pause plus a
-       YouTube shortcut (mobile's only way to reach it now that the
-       expanded player's copy is desktop-only, see .video-toggle-row).
-       Tapping either must not also trigger the bar's own
-       expand-to-full-player click handler, so their click listeners stop
-       propagation. */
+    /* Controls for the compact mini-player -- play/pause plus a YouTube
+       shortcut (mobile's only way to reach it now that the expanded
+       player's own copy is desktop-only, see .video-toggle-row). Sit in
+       their own row below the bar rather than squeezed inside it -- now
+       that "Радио" is a dedicated tab instead of sharing a page with
+       everything else, there's real room to give them a proper size and
+       a visible label instead of a small icon-only circle. */
+    .np-actions-row {
+      display: flex;
+      gap: 10px;
+      max-width: 320px;
+      width: 100%;
+      margin: 10px auto 0;
+    }
     .np-playpause-btn,
     .np-youtube-btn {
-      flex-shrink: 0;
-      width: 34px;
-      height: 34px;
-      border: none;
-      border-radius: 50%;
-      background-color: rgba(255, 255, 255, 0.08);
-      color: var(--md-sys-color-on-surface);
+      flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: 8px;
+      height: 48px;
+      border: none;
+      border-radius: 100px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
       cursor: pointer;
-      padding: 0;
+      text-decoration: none;
+      background-color: rgba(255, 255, 255, 0.08);
+      color: var(--md-sys-color-on-surface);
     }
-    /* YouTube's own brand red instead of the neutral icon-button fill --
-       confirmed directly, an icon-only button blending into the same
-       muted grey as everything else around it read as unclear/easy to
-       miss. The color alone makes it instantly recognizable as "the
-       YouTube button" without needing a text label the compact bar
-       doesn't have room for. */
+    /* Primary accent for play/pause -- it's the main action here, worth
+       standing out more than a neutral fill. YouTube keeps its own brand
+       red, already established elsewhere as instantly recognizable on
+       its own. */
+    .np-playpause-btn {
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+    }
     .np-youtube-btn {
       background-color: #FF0000;
       color: #fff;
     }
-    .np-playpause-btn svg, .np-youtube-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    .np-playpause-btn svg, .np-youtube-btn svg { width: 22px; height: 22px; fill: currentColor; flex-shrink: 0; }
 
     /* Marquee: only kicks in when the title/artist text actually overflows
        its container (measured in JS, see setMarqueeText) -- short text
@@ -1330,6 +1578,7 @@
        button, and force .player-inline visible regardless of .expanded. */
     @media (min-width: 1025px) {
       #now-playing { display: none !important; }
+      .np-actions-row { display: none !important; }
       .player-inline-header { display: none; }
       .player-inline {
         display: block !important;
@@ -1437,7 +1686,7 @@
     }
   </style>
 </head>
-<body>
+<body data-active-tab="radio">
   <div class="top-bar">
     <a href="/admin/" id="admin-link" class="admin-link" title="Панель администратора" aria-label="Панель администратора">
       <svg viewBox="0 0 24 24"><path d="M11 7l-1.41 1.41L12.17 11H2v2h10.17l-2.58 2.59L11 17l5-5zM20 3h-8v2h8v14h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
@@ -1445,7 +1694,7 @@
   </div>
   <div class="layout">
   <div class="main-cards">
-  <div class="m3-card card-about">
+  <div class="m3-card card-about" data-tab="about" id="card-about">
     <div class="avatar-container stagger-item delay-1">
       <img src="/avatar.jpg" alt="Your Radio">
     </div>
@@ -1483,8 +1732,14 @@
     </div>
   </div>
 
-  <div class="m3-card card-broadcast">
+  <div class="m3-card card-broadcast" data-tab="radio" id="card-broadcast">
     <div class="stagger-item delay-4">
+      <!-- Mobile only (see CSS) -- the "Радио" tab has nothing else naming
+           the station now that the channel-info card (with the real
+           title) lives in its own separate "О канале" tab. Desktop still
+           shows both cards side by side, so it'd just be a redundant
+           repeat of .card-about's own <h1> there. -->
+      <div class="radio-tab-title">Your Radio</div>
       <div class="on-air-label on-air-label-first">В эфире</div>
 
       <!-- Mobile: compact summary bar, tap to expand the full player below.
@@ -1497,16 +1752,24 @@
           <div class="np-progress-track"><div id="np-progress-fill" class="np-progress-fill"></div></div>
           <div class="np-time"><span id="np-elapsed">0:00</span> / <span id="np-duration">0:00</span></div>
         </div>
-        <!-- Mobile-only home for the YouTube link (see CSS/JS) -- desktop
-             never shows this bar at all, and keeps its own YouTube link in
-             the expanded player instead. Hidden until updateVideoLink
-             actually has a video_id for the current track. -->
-        <a href="#" id="np-youtube-btn" class="np-youtube-btn" target="_blank" rel="noopener noreferrer" title="Смотреть на YouTube" aria-label="Смотреть на YouTube" style="display: none;">
-          <svg viewBox="0 0 24 24"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
-        </a>
+      </div>
+
+      <!-- Own row below the bar, not nested inside it -- previously both
+           lived inside #now-playing itself and needed stopPropagation on
+           every click so tapping either didn't also trigger the bar's own
+           expand-to-full-player handler. Moved out, that's no longer a
+           concern at all. -->
+      <div class="np-actions-row">
         <button type="button" id="np-playpause-btn" class="np-playpause-btn" title="Играть" aria-label="Играть / пауза">
           <svg viewBox="0 0 24 24" id="np-playpause-icon"><path d="M8 5v14l11-7z"></path></svg>
+          <span id="np-playpause-label">Играть</span>
         </button>
+        <!-- Hidden until updateVideoLink actually has a video_id for the
+             current track. -->
+        <a href="#" id="np-youtube-btn" class="np-youtube-btn" target="_blank" rel="noopener noreferrer" title="Смотреть на YouTube" aria-label="Смотреть на YouTube" style="display: none;">
+          <svg viewBox="0 0 24 24"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
+          <span>YouTube</span>
+        </a>
       </div>
 
       <div id="player-inline" class="player-inline">
@@ -1595,19 +1858,10 @@
       </div>
       <audio id="radio-audio" preload="none"></audio>
     </div>
-    <div class="side-links stagger-item delay-4">
-      <a href="/radio/stream" target="_blank">MP3-поток</a>
-      <span class="side-links-dot">·</span>
-      <a href="/playlist.m3u" download>M3U</a>
-      <span class="side-links-dot">·</span>
-      <a href="/radio/stream.flac" target="_blank">FLAC-поток</a>
-      <span class="side-links-dot">·</span>
-      <a href="/playlist-flac.m3u" download>FLAC M3U</a>
-    </div>
   </div>
   </div>
 
-  <div id="queue-panel" class="queue-panel">
+  <div id="queue-panel" class="queue-panel" data-tab="radio">
     <div id="queue-description-panel" class="queue-description-panel">
       <h2>Описание</h2>
       <div id="queue-description-text" class="queue-description-text"></div>
@@ -1616,6 +1870,16 @@
     <div class="queue-list-wrap">
       <h2>Далее в эфире</h2>
       <ul id="queue-list" class="queue-list"></ul>
+    </div>
+    <hr class="queue-divider">
+    <div class="side-links stagger-item delay-4">
+      <a href="/radio/stream" target="_blank">MP3-поток</a>
+      <span class="side-links-dot">·</span>
+      <a href="/playlist.m3u" download>M3U</a>
+      <span class="side-links-dot">·</span>
+      <a href="/radio/stream.flac" target="_blank">FLAC-поток</a>
+      <span class="side-links-dot">·</span>
+      <a href="/playlist-flac.m3u" download>FLAC M3U</a>
     </div>
   </div>
   </div>
@@ -2172,6 +2436,7 @@
       playerStatus.style.display = 'none';
       npPlayPauseIcon.innerHTML = isPlaying ? iconPauseBars : iconPlayTriangle;
       npPlayPauseBtn.title = isPlaying ? 'Пауза' : 'Играть';
+      npPlayPauseLabel.textContent = isPlaying ? 'Пауза' : 'Играть';
       updateMediaSessionPlaybackState();
     }
 
@@ -2371,11 +2636,8 @@
     const npDurationEl = document.getElementById('np-duration');
     const npPlayPauseBtn = document.getElementById('np-playpause-btn');
     const npPlayPauseIcon = document.getElementById('np-playpause-icon');
-    // Minimal control on the mini-player: play/pause only. Must stop
-    // propagation, otherwise the click bubbles up to npBlock's own handler
-    // and expands the full player at the same time it toggles playback.
-    npPlayPauseBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+    const npPlayPauseLabel = document.getElementById('np-playpause-label');
+    npPlayPauseBtn.addEventListener('click', () => {
       toggleRadio();
     });
     let npLastUpdated = null;
@@ -2800,11 +3062,8 @@
     const videoToggleRow = document.getElementById('video-toggle-row');
     const videoLink = document.getElementById('video-link');
     const lyricsLink = document.getElementById('lyrics-link');
-    // Mobile's copy of the YouTube link, on the mini-player bar -- see
-    // .np-youtube-btn. Must stop propagation like np-playpause-btn, or the
-    // tap bubbles up to npBlock's own expand-to-full-player handler too.
+    // Mobile's copy of the YouTube link, in its own row below the mini-player bar.
     const npYoutubeBtn = document.getElementById('np-youtube-btn');
-    npYoutubeBtn.addEventListener('click', (e) => { e.stopPropagation(); });
 
     function updateVideoLink(videoId) {
       if (videoId) {
@@ -3371,6 +3630,88 @@
         return;
       }
     });
+  </script>
+
+  <!-- Mobile only (see .bottom-nav's own media query) -- desktop already
+       shows both cards + the queue side by side, nothing here to switch
+       between. Follows M3's Navigation Bar spec: fixed bar, active item
+       gets a pill-shaped indicator behind its icon. -->
+  <nav class="bottom-nav" role="tablist" aria-label="Разделы">
+    <button type="button" class="bottom-nav-item active" role="tab" aria-selected="true" aria-controls="card-broadcast queue-panel" data-tab-target="radio">
+      <span class="bottom-nav-icon-pill">
+        <svg viewBox="0 0 24 24">
+          <rect x="4" y="10" width="4" height="10" rx="1"></rect>
+          <rect x="10" y="4" width="4" height="16" rx="1"></rect>
+          <rect x="16" y="7" width="4" height="13" rx="1"></rect>
+        </svg>
+      </span>
+      <span class="bottom-nav-label">Радио</span>
+    </button>
+    <button type="button" class="bottom-nav-item" role="tab" aria-selected="false" aria-controls="card-about" data-tab-target="about">
+      <span class="bottom-nav-icon-pill">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path>
+          <circle cx="12" cy="8" r="1.2"></circle>
+          <rect x="11" y="11" width="2" height="7" rx="1"></rect>
+        </svg>
+      </span>
+      <span class="bottom-nav-label">О канале</span>
+    </button>
+  </nav>
+  <script>
+    (function () {
+      const buttons = document.querySelectorAll('.bottom-nav-item');
+      function switchTab(name) {
+        document.body.dataset.activeTab = name;
+        buttons.forEach((btn) => {
+          const isActive = btn.dataset.tabTarget === name;
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+        // Removed then re-added (with a forced reflow in between) rather
+        // than just added -- a class alone wouldn't replay its animation
+        // on switching back to a tab that still had it from a previous
+        // visit, since nothing about the class actually changed from the
+        // browser's point of view.
+        document.querySelectorAll('[data-tab="' + name + '"]').forEach((el) => {
+          el.classList.remove('tab-fade-in');
+          void el.offsetWidth;
+          el.classList.add('tab-fade-in');
+        });
+      }
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tabTarget));
+      });
+    })();
+  </script>
+
+  <script>
+    // Material ripple: tags the page's main tap targets with
+    // .ripple-target (see its CSS) and spawns an expanding circle
+    // centered on the actual tap point on every pointerdown, the same
+    // touch feedback Android's own Material components use. Delegated on
+    // document rather than one listener per element -- this also
+    // automatically covers the mini-player bar/nav items/etc. without
+    // needing to re-wire anything if they're ever re-rendered.
+    (function () {
+      const RIPPLE_SELECTOR = '.bottom-nav-item, .np-playpause-btn, .np-youtube-btn, ' +
+        '.btn-telegram, .btn-radio, .quality-btn, .player-icon-btn, #now-playing';
+      document.querySelectorAll(RIPPLE_SELECTOR).forEach((el) => el.classList.add('ripple-target'));
+
+      document.addEventListener('pointerdown', (e) => {
+        const target = e.target.closest(RIPPLE_SELECTOR);
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple';
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+        ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+        target.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove());
+      });
+    })();
   </script>
 </body>
 </html>
