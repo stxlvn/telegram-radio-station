@@ -724,6 +724,13 @@
        than orientation so a landscape tablet -- plenty of height to
        spare -- keeps the portrait layout instead. */
     @media (max-width: 1024px) and (max-height: 500px) {
+      /* Same idea as the narrow-portrait rule below (max-width: 420px) --
+         the base 320px cap was sized for portrait, where the card itself
+         is already that narrow. In landscape the card keeps its full
+         500px allowance (see .m3-card) while height is what's actually
+         tight, so the collapsed mini-player had a couple hundred spare
+         pixels sitting unused beside it. */
+      .now-playing { max-width: 100%; }
       .player-inline.expanded,
       .player-inline.closing {
         display: flex;
