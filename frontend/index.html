@@ -410,12 +410,12 @@
       -webkit-backdrop-filter: blur(20px);
       padding-bottom: env(safe-area-inset-bottom);
     }
-    /* Slid fully off-screen for the duration of a scroll gesture (see the
-       scroll-hide script) instead of trying to keep it glued in place
-       during it -- whatever the browser's address-bar transition does to
-       a fixed element while scrolling happens off-screen, invisible, and
-       it slides back in on its own clean transition once scrolling has
-       actually settled. */
+    /* Slid fully off-screen while scrolling down (see the scroll-hide
+       script) instead of trying to keep it glued in place during it --
+       whatever the browser's address-bar transition does to a fixed
+       element happens off-screen, invisible. Slides back in on scroll-up
+       on its own clean transition, nothing fighting the browser's own
+       async scroll timing. */
     .bottom-nav.nav-scroll-hidden {
       transform: translateY(100%);
     }
@@ -3892,21 +3892,27 @@
       // than tracking the address bar at all, per Mozilla's own bug
       // tracker -- an open, unfixed bug on their end.
       // Given that, this sidesteps the problem instead of fighting it:
-      // hide the bar for the duration of the scroll gesture (so whatever
-      // jitter/snap the browser's address-bar transition causes happens
-      // while it's off-screen and invisible), then slide it back in once
-      // scrolling has actually settled -- a plain, one-time CSS
-      // transition at that point, nothing fighting the browser's own
-      // async scroll timing.
+      // hide the bar on scroll-down (so whatever jitter/snap the
+      // browser's address-bar transition causes happens while it's
+      // off-screen and invisible), and slide it back in on scroll-up --
+      // the standard mobile show-on-scroll-up pattern, per request. A
+      // small threshold (5px) avoids toggling on sub-pixel scroll noise;
+      // always shown right at the top of the page regardless of the last
+      // direction.
       const nav = document.querySelector('.bottom-nav');
       if (!nav) return;
-      let hideTimeout = null;
+      let lastScrollY = window.scrollY;
       function onScroll() {
-        nav.classList.add('nav-scroll-hidden');
-        clearTimeout(hideTimeout);
-        hideTimeout = setTimeout(() => {
+        const currentY = window.scrollY;
+        const delta = currentY - lastScrollY;
+        if (currentY <= 0) {
           nav.classList.remove('nav-scroll-hidden');
-        }, 200);
+        } else if (delta > 5) {
+          nav.classList.add('nav-scroll-hidden');
+        } else if (delta < -5) {
+          nav.classList.remove('nav-scroll-hidden');
+        }
+        lastScrollY = currentY;
       }
       window.addEventListener('scroll', onScroll, { passive: true });
     })();
