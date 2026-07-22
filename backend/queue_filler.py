@@ -432,15 +432,34 @@ def parse_caption_artist_album(caption):
 # artist whose name happens to contain "va".
 _VARIOUS_ARTISTS_EXACT = {"va", "v.a.", "v/a", "various", "various artists"}
 
+# The channel's own caption convention also carries a separate "✍️ Author:"
+# / "✍️ Автор:" line, distinct from the "🎵 Artist — Album" line above --
+# confirmed directly: a Hotline Miami OST batch captioned "🎵 Hotline Miami
+# – Soundtracks ... ✍️ Author: Various Artists" doesn't trip the check
+# above at all, since the "🎵" line's own artist half reads as the game's
+# own name ("Hotline Miami"), not "Various Artists" -- wrongly leaving Sun
+# Araw's real "Deep Cover" (one contributing artist among many on that
+# soundtrack) exposed to the whole batch's shared, wildly varied genre
+# hashtags (#ambient among them) meant for the compilation as a whole, not
+# his one track. Checked independently, not only as a fallback to the "🎵"
+# line, since either one alone is real evidence of a Various-Artists post.
+AUTHOR_LINE_RE = re.compile(r"✍️\s*(?:Author|Автор)\s*:?\s*(.+)", re.IGNORECASE)
+
 
 def is_various_artists_caption(caption):
+    candidates = []
     cap_artist, _ = parse_caption_artist_album(caption)
-    if not cap_artist:
-        return False
-    normalized = cap_artist.strip().lower()
-    if "various artist" in normalized:
-        return True
-    return normalized in _VARIOUS_ARTISTS_EXACT
+    if cap_artist:
+        candidates.append(cap_artist.strip().lower())
+    m = AUTHOR_LINE_RE.search(caption or "")
+    if m:
+        candidates.append(m.group(1).strip().lower())
+    for normalized in candidates:
+        if "various artist" in normalized:
+            return True
+        if normalized in _VARIOUS_ARTISTS_EXACT:
+            return True
+    return False
 
 
 # Same token as publish_now_playing.py's Discogs fallback, but text-only --
@@ -657,7 +676,26 @@ def check_ambient_via_discogs(artist, title):
 # Matched case-insensitively as a substring of the artist field, since
 # credits show up as anything from "Joe Hisaishi" to "Joe Hisaishi, Studio
 # Ghibli" to just "Hisaishi".
-AMBIENT_EXEMPT_ARTISTS = ("hisaishi", "studio ghibli", "miyazaki", "ghibli")
+#
+# "магомаев" is the same kind of unfixable-by-a-general-rule case, just
+# from the opposite direction: confirmed directly, Муслим Магомаев's
+# "Парад заграничных певцов" (a real sung comedic number from the 1973
+# Soviet animated musical "По следам Бременских музыкантов") got excluded
+# via its embedded FLAC genre tag "Soundtrack, Score, Stage & Screen" --
+# release-level Discogs style tags on a film-music compilation, copied
+# wholesale into every track's genre field by whoever ripped it, with
+# nothing distinguishing this one sung track from the compilation's actual
+# instrumental cues. The caption's own hashtags (#soundtrack #musical
+# #fairytale #childrens #nostalgic, no #score/#ambient) already got this
+# right; only the embedded tag disagreed. Discogs' contextual/vocal-genre
+# override (_CONTEXTUAL_AMBIENT_STYLES/_VOCAL_LEANING_GENRES) doesn't save
+# this either, since "Score" is trusted outright there and no vocal-
+# leaning genre rides along beside it to contradict it. Same fix shape as
+# Hisaishi: a small, explicit exemption for a specific artist known to get
+# mistagged this way, rather than a general rule that would need
+# track-level tracklist verification against the *local* embedded tag
+# (which, unlike Discogs' own search results, has no such check today).
+AMBIENT_EXEMPT_ARTISTS = ("hisaishi", "studio ghibli", "miyazaki", "ghibli", "магомаев")
 
 
 def is_ambient_exempt(artist):
