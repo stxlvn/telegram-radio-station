@@ -133,16 +133,26 @@
       font-family: 'Product Sans', 'Roboto Flex', system-ui, sans-serif;
       background-color: var(--md-sys-color-background);
       color: var(--md-sys-color-on-surface);
-      /* dvh, not vh -- 100vh on mobile browsers uses the *largest*
+      /* svh, not vh -- 100vh on mobile browsers uses the *largest*
          possible viewport (as if the address bar/toolbar were always
          hidden), which can genuinely be taller than what's on screen at
          any given moment. body sizing itself to that larger figure would
          make .layout's centering compute its "middle" against a box
          taller than the visible area, landing visibly low/toward the
          bottom of whatever's actually on screen even though it's
-         correctly centered within body's own (too-tall) box. dvh tracks
-         the real, current visual viewport instead. */
-      min-height: 100dvh;
+         correctly centered within body's own (too-tall) box.
+         Not dvh either -- confirmed directly dvh made the fixed
+         .bottom-nav visibly jump/judder while scrolling, since dvh
+         recalculates continuously as the browser's toolbar collapses
+         mid-scroll and body's own height (hence everything anchored
+         against it) recomputes on every one of those frames. svh is the
+         *smallest* possible viewport (toolbar always assumed visible) --
+         a fixed value that never changes during a scroll gesture, so
+         nothing sized against it ever needs to re-lay-out mid-scroll.
+         Worst case is a little unused space at the very bottom on the
+         rare frame the toolbar is actually hidden -- far preferable to
+         a shaking bar. */
+      min-height: 100svh;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -359,7 +369,7 @@
          resets body's top padding to 16px instead of 24px. */
       .layout {
         justify-content: safe center;
-        min-height: calc(100dvh - (24px + env(safe-area-inset-top)) - 36px - 20px - (24px + 64px + env(safe-area-inset-bottom)));
+        min-height: calc(100svh - (24px + env(safe-area-inset-top)) - 36px - 20px - (24px + 64px + env(safe-area-inset-bottom)));
       }
 
       /* Reserve room for the fixed bar itself, on top of whatever the
@@ -373,7 +383,7 @@
     @media (max-width: 420px) {
       body { padding-bottom: calc(16px + 64px + env(safe-area-inset-bottom)); }
       .layout {
-        min-height: calc(100dvh - (16px + env(safe-area-inset-top)) - 36px - 20px - (16px + 64px + env(safe-area-inset-bottom)));
+        min-height: calc(100svh - (16px + env(safe-area-inset-top)) - 36px - 20px - (16px + 64px + env(safe-area-inset-bottom)));
       }
     }
 
@@ -735,6 +745,11 @@
       border: none; border-radius: 100px;
       padding: 8px 16px; font-size: 0.82rem; font-weight: 600;
       cursor: pointer;
+      /* Also used as an <a href> for the Android APK download, not just a
+         <button> -- display/text-decoration reset so it renders identically
+         to the button case instead of showing as an inline underlined link. */
+      display: inline-block;
+      text-decoration: none;
     }
     .install-banner-dismiss {
       background: none; color: var(--md-sys-color-on-surface-variant);
@@ -2285,16 +2300,17 @@
     }
 
     const INSTALL_BANNER_DISMISSED_KEY = 'installBannerDismissed';
-    let deferredInstallPrompt = null;
-    // Chrome/Edge/Android only -- fired when the browser itself decides the
-    // page meets its installability criteria. Capturing it (instead of
-    // letting the browser show its own mini-infobar) is what lets our own
-    // banner's button trigger the real install prompt on demand, timed to
-    // when it's actually relevant (see maybeShowInstallBanner) rather than
-    // whenever Chrome happens to notice.
+    // Android now offers the TWA APK download below instead of the plain
+    // PWA/WebAPK install -- Chrome's own theme-color only ever reaches the
+    // status bar for a home-screen-installed PWA, never the system
+    // navigation bar (a long-standing, still-open Chromium limitation:
+    // issues.chromium.org/issues/40759522); a TWA has a real, separate
+    // navigationColor Android actually honors. Still capturing and
+    // preventDefault()-ing the event, purely to suppress Chrome's own
+    // automatic "Add to Home Screen" mini-infobar from popping up
+    // alongside our banner -- its prompt() is just never called anymore.
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
-      deferredInstallPrompt = e;
     });
 
     function isRunningStandalone() {
@@ -2312,10 +2328,6 @@
       // exists for is a mobile-tab-throttling issue, installing on desktop
       // wouldn't address anything a user actually asked about.
       if (!isIOS && !isAndroid) return;
-      // Android: only worth showing once Chrome has actually confirmed
-      // installability by firing beforeinstallprompt -- without it there's
-      // no real button to offer, just a broken promise.
-      if (isAndroid && !deferredInstallPrompt) return;
 
       const banner = document.getElementById('install-banner');
       const textEl = document.getElementById('install-banner-text');
@@ -2339,18 +2351,14 @@
         actionsEl.appendChild(okBtn);
       } else {
         textEl.textContent = 'Без установки браузер со временем обрывает звук, '
-          + 'когда экран заблокирован. Установите приложение — фон станет стабильнее.';
-        const installBtn = document.createElement('button');
-        installBtn.type = 'button';
+          + 'когда экран заблокирован. Установите приложение — фон станет стабильнее. '
+          + 'При первой установке Android спросит разрешение на файлы из '
+          + 'внешнего источника — это ожидаемо, приложение не из Google Play.';
+        const installBtn = document.createElement('a');
+        installBtn.href = '/downloads/your-radio.apk';
         installBtn.className = 'install-banner-install';
-        installBtn.textContent = 'Установить';
-        installBtn.addEventListener('click', async () => {
-          dismiss();
-          if (!deferredInstallPrompt) return;
-          deferredInstallPrompt.prompt();
-          try { await deferredInstallPrompt.userChoice; } catch (e) {}
-          deferredInstallPrompt = null;
-        });
+        installBtn.textContent = 'Скачать приложение';
+        installBtn.addEventListener('click', () => dismiss());
         const laterBtn = document.createElement('button');
         laterBtn.type = 'button';
         laterBtn.className = 'install-banner-dismiss';
