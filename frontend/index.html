@@ -399,37 +399,19 @@
          zeroed on the sides (kept top/bottom) so its children fill that
          box edge to edge exactly like the others do. */
       #queue-panel { max-width: 320px; padding-left: 0; padding-right: 0; }
-      /* Compacted specifically so 5 upcoming tracks fit on one mobile
-         screen without needing to scroll into them -- per request. First
-         pass (row-level: heading margin, row gap/padding, number-circle
-         size, both text lines) still wasn't enough on its own -- the
-         bigger space was actually .m3-card's own top/bottom padding
-         (still the full 40px desktop figure between 421-1024px wide,
-         .m3-card's mobile override only ever existed at the narrower
-         420px breakpoint) plus #queue-panel's own 28px top/bottom
-         padding (only its *sides* were zeroed before, see #queue-panel
-         right above) plus the 20px gaps both above .main-cards (body)
-         and between it and #queue-panel (.layout). Trimming all of these
-         together frees up real estate none of them could on their own. */
-      .m3-card { padding: 24px 20px; }
-      #queue-panel { padding-top: 14px; padding-bottom: 14px; }
-      body { gap: 12px; }
-      .layout { gap: 12px; }
-      .queue-panel h2 { margin-bottom: 10px; }
-      .queue-list { gap: 4px; }
-      .queue-item { padding: 5px 6px; gap: 8px; }
-      .queue-item .qi-num { width: 20px; height: 20px; font-size: 0.68rem; }
-      .queue-item .qi-title { font-size: 0.82rem; }
-      .queue-item .qi-artist { font-size: 0.72rem; }
-      /* Per request: rather than keep squeezing padding/font-size
-         further to fit a 6th+ track, cap the list at roughly 5 compact
-         rows' worth of height (5 * ~42px row + 4 * 4px gaps) and let it
-         scroll internally past that instead. overscroll-behavior:contain
-         keeps that internal scroll from bubbling up into body's own
-         overflow (see the document-scroll-lock rule above) once the list
-         itself hits its own top/bottom edge. */
+      /* Two rounds of shrinking padding/font-size/gaps to fit a 5th
+         queue row (row-level, then card/panel/gap-level too) made the
+         whole tab read as too cramped overall -- reverted all of it back
+         to the original spacing. The actual fix for a longer queue is
+         this max-height + internal scroll instead: past roughly 5 rows'
+         worth of height, the list scrolls on its own rather than the
+         whole tab needing to shrink to fit however many happen to be
+         queued. overscroll-behavior:contain keeps that internal scroll
+         from bubbling up into body's own overflow (see the
+         document-scroll-lock rule above) once the list itself hits its
+         own top/bottom edge. */
       .queue-list {
-        max-height: 226px;
+        max-height: 300px;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
@@ -4009,8 +3991,28 @@
       let currentDy = 0;
       let refreshing = false;
 
+      // Wasn't checking *what* was actually being pulled -- confirmed
+      // directly this fired both with the fullscreen player open (any
+      // touch anywhere still bubbles up to body, and body's own
+      // scrollTop is 0 behind an open overlay regardless) and while
+      // scrolling inside .queue-list's own independent overflow (also
+      // starts at its own top=0 initially, same false trigger). Skip
+      // starting a pull at all when the touch begins inside any
+      // independently-scrollable region, or while the fullscreen player
+      // overlay is open.
+      const PULL_REFRESH_EXCLUDE_SELECTOR =
+        '.queue-list, .queue-description-text, .player-inline-body, .player-description-text';
+      function pullRefreshBlocked(target) {
+        const playerInline = document.querySelector('.player-inline');
+        if (playerInline && playerInline.classList.contains('expanded')) return true;
+        return !!(target && target.closest && target.closest(PULL_REFRESH_EXCLUDE_SELECTOR));
+      }
+
       document.body.addEventListener('touchstart', (e) => {
-        if (refreshing || document.body.scrollTop > 0) { startY = null; return; }
+        if (refreshing || document.body.scrollTop > 0 || pullRefreshBlocked(e.target)) {
+          startY = null;
+          return;
+        }
         startY = e.touches[0].clientY;
         indicator.classList.remove('pull-snapping');
       }, { passive: true });
