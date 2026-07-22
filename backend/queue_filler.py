@@ -248,7 +248,18 @@ def is_live_version(title=None, album=None, *texts):
 # itself as "[Company] Game Music" directly in the artist field is a
 # reliable signal on its own -- no ordinary band or solo artist's own name
 # reads that way.
-AMBIENT_KEYWORDS = ("ambient", "suite", "theme", "score", "cue", "underscore", "reprise", "game music")
+#
+# "sound team" is the same class of problem, different naming convention:
+# confirmed directly, "ATLUS Sound Team" aired uncaught on several Persona
+# 5 (Royal) score cues ("The Almighty", "The Genesis", "I'll Face Myself
+# -another version-") for the exact same reason -- Discogs credits the
+# real individual composer (Shoji Meguro et al.), not "ATLUS Sound Team",
+# so the artist-match gate never got far enough to see the release's own
+# game-music genre tags either. Several other studios use this same
+# in-house-credit convention (Nintendo/Capcom/Konami "Sound Team" are all
+# real, common examples), so this is a reusable signal, not an
+# Atlus-specific patch.
+AMBIENT_KEYWORDS = ("ambient", "suite", "theme", "score", "cue", "underscore", "reprise", "game music", "sound team")
 # The channel's own hashtag convention (e.g. "#disco #eurodisco #rnb #pop")
 # on the description post right before a batch of tracks -- a much more
 # precise signal than fuzzy keyword matching when it's there.
@@ -306,7 +317,17 @@ def strip_label_line(caption):
 # score composer Patrick Doyle) sitting inside an 8-film Harry Potter score
 # compilation tagged #score/#soundtrack. The channel's own explicit
 # annotation on the individual track outranks the shared post's hashtags.
-SONG_ANNOTATION_RE = re.compile(r"\(song\)", re.IGNORECASE)
+# The word "song" also turns up unannotated, right in a legitimate track's
+# own official title -- confirmed directly: The Monkees' "The Porpoise Song
+# (Theme From The Head)" (a real, sung 1968 single from the film "Head")
+# got excluded because "theme" in its own parenthetical is one of
+# AMBIENT_KEYWORDS -- "Theme From X" is also how several real vocal singles
+# tied to a film brand themselves, not just instrumental scoring, so it's
+# not a reliable ambient signal on its own. Any occurrence of "song" as a
+# whole word is treated the same as the "(Song)" annotation above (and
+# "\bsong\b" can't false-positive on words like "Songwriter" since the
+# trailing word boundary requires a non-word character right after).
+SONG_ANNOTATION_RE = re.compile(r"\(song\)|\bsong\b", re.IGNORECASE)
 
 # An explicit featured-vocalist credit right in the artist field is direct
 # evidence real singing is on the track -- confirmed directly: "Two
