@@ -385,6 +385,19 @@
       .queue-item .qi-num { width: 20px; height: 20px; font-size: 0.68rem; }
       .queue-item .qi-title { font-size: 0.82rem; }
       .queue-item .qi-artist { font-size: 0.72rem; }
+      /* Per request: rather than keep squeezing padding/font-size
+         further to fit a 6th+ track, cap the list at roughly 5 compact
+         rows' worth of height (5 * ~42px row + 4 * 4px gaps) and let it
+         scroll internally past that instead. overscroll-behavior:contain
+         keeps that internal scroll from bubbling up into body's own
+         overflow (see the document-scroll-lock rule above) once the list
+         itself hits its own top/bottom edge. */
+      .queue-list {
+        max-height: 226px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
       /* .side-links was center-aligned, everything else in this tab is
          left-aligned against that shared 320px box. !important since its
          own base rule (same specificity, plain class selector) is
