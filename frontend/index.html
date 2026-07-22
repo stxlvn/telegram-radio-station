@@ -364,11 +364,21 @@
          box edge to edge exactly like the others do. */
       #queue-panel { max-width: 320px; padding-left: 0; padding-right: 0; }
       /* Compacted specifically so 5 upcoming tracks fit on one mobile
-         screen without needing to scroll into them -- per request.
-         Shrinks the heading's own bottom margin, the gap between rows,
-         each row's own padding/gap, the number-circle size, and both
-         text lines a notch, rather than any one of those doing all the
-         work alone. */
+         screen without needing to scroll into them -- per request. First
+         pass (row-level: heading margin, row gap/padding, number-circle
+         size, both text lines) still wasn't enough on its own -- the
+         bigger space was actually .m3-card's own top/bottom padding
+         (still the full 40px desktop figure between 421-1024px wide,
+         .m3-card's mobile override only ever existed at the narrower
+         420px breakpoint) plus #queue-panel's own 28px top/bottom
+         padding (only its *sides* were zeroed before, see #queue-panel
+         right above) plus the 20px gaps both above .main-cards (body)
+         and between it and #queue-panel (.layout). Trimming all of these
+         together frees up real estate none of them could on their own. */
+      .m3-card { padding: 24px 20px; }
+      #queue-panel { padding-top: 14px; padding-bottom: 14px; }
+      body { gap: 12px; }
+      .layout { gap: 12px; }
       .queue-panel h2 { margin-bottom: 10px; }
       .queue-list { gap: 4px; }
       .queue-item { padding: 5px 6px; gap: 8px; }
