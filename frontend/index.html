@@ -224,6 +224,41 @@
       .main-cards { flex-direction: column; align-items: center; }
     }
 
+    /* Confirmed directly (screen recording, and confirmed against
+       unrelated third-party sites in the same browser on the same phone)
+       that the whole "page jumps while scrolling" symptom on mobile is
+       Android's own address-bar collapse/expand animation, tied to the
+       *document* (<html>) itself being the thing that scrolls -- not
+       anything this site's code was doing, and not fixable by any CSS
+       positioning scheme or JS correction on a fixed/sticky element (all
+       tried, none had any effect, see the .queue-list overflow-anchor
+       comment for one of them that was a real but separate bug).
+       The actual fix: stop <html> from ever being scrollable at all, so
+       the browser has nothing at the document level to react to and
+       never touches its own toolbar. All the real scrolling moves down
+       one level, to body's own overflow -- a plain overflow:auto
+       container behaves identically from the user's point of view
+       (mouse wheel, touch-drag, momentum/rubber-banding), the browser
+       chrome just never gets involved because it isn't the document
+       itself moving. Fixed-position children of body (.bottom-nav, the
+       modals, snackbar, install banner) are completely unaffected --
+       position:fixed is defined relative to the viewport regardless of
+       whether some ancestor also happens to scroll internally.
+       Not scoped to a mobile media query -- same scrolling mechanism
+       everywhere (desktop included) rather than one behavior on some
+       screens and a different one on others, per request. Desktop never
+       had the address-bar problem this exists for, but an ordinary
+       overflow:auto container scrolls identically to the document itself
+       for a mouse/trackpad, so there's nothing desktop loses by sharing
+       the same mechanism. */
+    html { height: 100%; overflow: hidden; }
+    body {
+      height: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
     /* Bottom tab navigation -- mobile only. Desktop already shows the
        channel-info card and the player/queue side by side with nothing
        fighting for scroll space, so there's no "too much on one page"
