@@ -237,7 +237,18 @@ def is_live_version(title=None, album=None, *texts):
 # too, and those should just play like any other track. Only the more
 # specific score/instrumental/cinematic-style signals actually mean "this
 # is background scoring, not a song".
-AMBIENT_KEYWORDS = ("ambient", "suite", "theme", "score", "cue", "underscore", "reprise")
+# "game music" catches publisher-style batch credits that name the
+# development team instead of the actual composers -- confirmed directly:
+# "TEKKEN Project, Bandai Namco Game Music - Heat Haze Shadow 1" (a Tekken
+# 7 battle-theme cue) aired uncaught because Discogs credits that same
+# release to the real composers by name ("BNSI, Yuu Miyake, AJURIKA...",
+# zero string overlap with the file's own artist credit), so the
+# Discogs-tag check never even got past its own artist-match gate to see
+# the release's Stage & Screen/Video Game Music tags. A publisher crediting
+# itself as "[Company] Game Music" directly in the artist field is a
+# reliable signal on its own -- no ordinary band or solo artist's own name
+# reads that way.
+AMBIENT_KEYWORDS = ("ambient", "suite", "theme", "score", "cue", "underscore", "reprise", "game music")
 # The channel's own hashtag convention (e.g. "#disco #eurodisco #rnb #pop")
 # on the description post right before a batch of tracks -- a much more
 # precise signal than fuzzy keyword matching when it's there.
@@ -273,6 +284,21 @@ AMBIENT_HASHTAGS = {"ambient", "score", "instrumental", "cinematic", "underscore
 NON_AMBIENT_HASHTAGS = {"vocal", "vocals", "hip_hop", "pop"}
 
 HASHTAG_RE = re.compile(r"#(\w+)")
+# The channel's own caption convention always includes a "🏷 Лейбл: X" line
+# naming the release's record label -- arbitrary metadata about who put the
+# record out, not a description of the music itself, but "X" is free text
+# and label names collide with real keywords purely by coincidence.
+# Confirmed directly: both Depeche Mode's "Suffer Well" ("🏷 Лейбл: Mute /
+# Reprise") and Green Day's "Basket Case" ("🏷 Лейбл: Reprise Records") --
+# two ordinary vocal songs with nothing to do with a musical reprise --
+# got excluded because "reprise" is one of AMBIENT_KEYWORDS and Reprise
+# Records is a real, fairly common label. Stripped out before any
+# keyword/hashtag check runs against caption text.
+LABEL_LINE_RE = re.compile(r"^.*🏷.*$", re.MULTILINE)
+
+
+def strip_label_line(caption):
+    return LABEL_LINE_RE.sub("", caption or "")
 # Channel convention on multi-composer/multi-film score compilations:
 # tagging one specific entry "(Song)" to call it out from the surrounding
 # score cues -- confirmed directly on "Magic Works (Song)" (the real
@@ -741,6 +767,79 @@ def album_quota_exceeded(history, key):
     return sum(1 for ts in stamps if now - ts < album_window) >= album_daily_limit
 
 
+# album_quota_exceeded only ever limits repeats of one specific album --
+# real-world reports of specific artists (Curta'n Wall, Marilyn Manson)
+# showing up constantly turned out to be exactly that: each *individual*
+# album/single they're credited on was correctly staying under its own
+# 2-per-24h cap (confirmed directly, both against real captions and the
+# actual album-history file), but an artist with several different
+# releases in the archive has nothing capping how often *any one of them*
+# gets picked, in aggregate. This runs whenever *artist* is known at all
+# (almost always, unlike album, which several real batch uploads turned
+# out to have no caption/embedded tag for at all -- this also covers that
+# narrower case as a side effect, though it wasn't the main cause here).
+#
+# Two-tier, not a flat rolling-window count like the album quota: up to
+# artist_daily_limit plays inside artist_day_window (24h) are allowed, but
+# once that's been reached, the next play needs a full artist_cooldown
+# (48h) gap from the *most recent* play specifically -- not just for the
+# oldest of the two to roll back out of a 24h window, which could still
+# let a third play land only a little more than a day after the first.
+# Since artist_cooldown (48h) is longer than artist_day_window (24h), it's
+# always the binding constraint once the daily cap is hit: by the time
+# 48h have passed since the most recent play, the daily-window count has
+# necessarily dropped below the limit too.
+artist_history_path = os.environ.get("ARTIST_PLAY_HISTORY_PATH", "/opt/radio/artist_play_history.json")
+artist_day_window = 24 * 3600  # seconds
+artist_daily_limit = 2  # max plays of the same artist inside that window before the cooldown below kicks in
+artist_cooldown = 48 * 3600  # seconds; required gap since the most recent play once the daily limit's been hit
+
+
+def load_artist_history():
+    try:
+        with open(artist_history_path) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_artist_history(history):
+    now = time.time()
+    # Pruned against the longer of the two windows (the cooldown, not the
+    # daily one) -- an entry still has to survive long enough to be seen
+    # by the cooldown check even after it's aged out of the daily count.
+    pruned = {
+        key: [ts for ts in stamps if now - ts < artist_cooldown]
+        for key, stamps in history.items()
+    }
+    pruned = {key: stamps for key, stamps in pruned.items() if stamps}
+    tmp = artist_history_path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(pruned, f)
+    os.replace(tmp, artist_history_path)
+    return pruned
+
+
+def artist_key(artist):
+    # Not split on multiple co-credited artists ("Curta'n Wall, DJ JOHN")
+    # -- treated as its own distinct identity, same as album_key already
+    # does for artist+album together. Splitting would mean a collab counts
+    # against *both* names' individual quotas, which isn't obviously more
+    # correct and adds real complexity for a case that hasn't come up as
+    # a problem on its own.
+    return (artist or "").strip().lower()
+
+
+def artist_quota_exceeded(history, key):
+    now = time.time()
+    stamps = history.get(key, [])
+    recent_in_day = sum(1 for ts in stamps if now - ts < artist_day_window)
+    if recent_in_day < artist_daily_limit:
+        return False
+    most_recent = max(stamps)
+    return now - most_recent < artist_cooldown
+
+
 # MTProto itself multiplexes many connections per client (this is how
 # Telegram-backed proxies push high throughput), and the box's own uplink is
 # nowhere near saturated by a single download (~550KB/s on one connection vs
@@ -781,7 +880,7 @@ async def mark_excluded(sid, excluded, reason):
     print(f"excluded {sid}: {reason}", file=sys.stderr)
 
 
-async def process_candidate(client, entity, candidate_id, excluded, play_history, album_history):
+async def process_candidate(client, entity, candidate_id, excluded, play_history, album_history, artist_history):
     sid = str(candidate_id)
     candidate = await client.get_messages(entity, ids=candidate_id)
     if candidate is None or not (candidate.audio or candidate.voice):
@@ -820,7 +919,7 @@ async def process_candidate(client, entity, candidate_id, excluded, play_history
     preceding_caption = ""
     if not looks_ambient(duration, file_title, file_name):
         preceding_caption = await get_preceding_caption(client, entity, candidate_id)
-    ambient_caption = "" if is_various_artists_caption(preceding_caption) else preceding_caption
+    ambient_caption = "" if is_various_artists_caption(preceding_caption) else strip_label_line(preceding_caption)
     if not is_ambient_exempt(file_performer) and looks_ambient(duration, file_title, file_name, ambient_caption):
         await mark_excluded(sid, excluded, f"looks_ambient (early, filename+caption): title={file_title!r} caption={ambient_caption[:120]!r}")
         return False
@@ -874,6 +973,19 @@ async def process_candidate(client, entity, candidate_id, excluded, play_history
         if exceeded:
             os.remove(path)
             return False
+    # Unlike the album check above, this runs whenever artist is known at
+    # all -- confirmed directly this gap was real: a batch upload with no
+    # caption and no embedded album tag skips the album check entirely
+    # (it only ever runs `if album:`), so an artist could show up as often
+    # as the random draw happened to pick them with nothing to slow it
+    # down. See artist_quota_exceeded for the exact allowance.
+    if artist:
+        artist_k = artist_key(artist)
+        async with state_lock:
+            artist_exceeded = artist_quota_exceeded(artist_history, artist_k)
+        if artist_exceeded:
+            os.remove(path)
+            return False
     # Last resort: ask Discogs for the release (artist + album hint from
     # the caption, or whatever text is available), then match this
     # file's own duration against that release's tracklist to find the
@@ -898,7 +1010,7 @@ async def process_candidate(client, entity, candidate_id, excluded, play_history
         os.remove(path)
         await mark_excluded(sid, excluded, f"is_live_version (full): title={title!r} album={album!r}")
         return False
-    ambient_caption_full = "" if is_various_artists_caption(preceding_caption) else preceding_caption
+    ambient_caption_full = "" if is_various_artists_caption(preceding_caption) else strip_label_line(preceding_caption)
     if not is_ambient_exempt(artist) and looks_ambient(duration, genre, artist, title, ambient_caption_full):
         os.remove(path)
         await mark_excluded(sid, excluded, f"looks_ambient (full): artist={artist!r} title={title!r} genre={genre!r}")
@@ -939,11 +1051,15 @@ async def process_candidate(client, entity, candidate_id, excluded, play_history
             key = album_key(artist, album)
             album_history.setdefault(key, []).append(time.time())
             save_album_history(album_history)
+        if artist:
+            artist_k = artist_key(artist)
+            artist_history.setdefault(artist_k, []).append(time.time())
+            save_artist_history(artist_history)
     print(f"queued {final_dest}", file=sys.stderr)
     return True
 
 
-async def worker(client, entity, ids, excluded, play_history, album_history):
+async def worker(client, entity, ids, excluded, play_history, album_history, artist_history):
     while True:
         candidate_id = await reserve_candidate(ids, excluded, play_history)
         if candidate_id is None:
@@ -951,7 +1067,7 @@ async def worker(client, entity, ids, excluded, play_history, album_history):
             continue
         failed = False
         try:
-            await process_candidate(client, entity, candidate_id, excluded, play_history, album_history)
+            await process_candidate(client, entity, candidate_id, excluded, play_history, album_history, artist_history)
         except Exception as e:
             print(f"fill error: {e}", file=sys.stderr)
             failed = True
@@ -979,16 +1095,25 @@ async def main():
     excluded = load_excluded()
     play_history = load_play_history()
     album_history = load_album_history()
+    artist_history = load_artist_history()
 
     client = TelegramClient(session_path, api_id, api_hash)
     await client.start()
     entity = await client.get_entity(channel)
 
     workers = [
-        asyncio.create_task(worker(client, entity, ids, excluded, play_history, album_history))
+        asyncio.create_task(worker(client, entity, ids, excluded, play_history, album_history, artist_history))
         for _ in range(max_concurrent_downloads)
     ]
     await asyncio.gather(*workers)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    # Confirmed directly this was a real, live footgun: importing this
+    # file as a module (e.g. from a one-off diagnostic script wanting to
+    # reuse parse_caption_artist_album or similar) ran the *entire* fill
+    # loop as a side effect of the import statement alone, with no way to
+    # opt out short of not importing it at all -- a second, unintended
+    # instance ended up racing the real systemd service against the same
+    # shared state files and downloading into the same queue directory.
+    asyncio.run(main())
