@@ -369,27 +369,52 @@
          resets body's top padding to 16px instead of 24px. */
       .layout {
         justify-content: safe center;
-        min-height: calc(100svh - (24px + env(safe-area-inset-top)) - 36px - 20px - (24px + 64px + env(safe-area-inset-bottom)));
+        /* The subtracted bottom term is now .bottom-nav's own real
+           in-flow height (64px + its safe-area-inset-bottom padding), not
+           body's padding -- body no longer reserves anything for it, see
+           right below. */
+        min-height: calc(100svh - (24px + env(safe-area-inset-top)) - 36px - 20px - (64px + env(safe-area-inset-bottom)));
       }
 
-      /* Reserve room for the fixed bar itself, on top of whatever the
-         narrower-phone breakpoint further down already reserves for the
-         notch/home-indicator -- declared after both existing body padding
-         rules (source order, same specificity) so it always wins on the
-         one property it touches instead of getting clobbered by the
-         420px breakpoint's own full padding shorthand. */
-      body { padding-bottom: calc(24px + 64px + env(safe-area-inset-bottom)); }
+      /* Used to reserve room here for the fixed bar (an out-of-flow
+         overlay that would otherwise cover body's own last bit of
+         content). Now that .bottom-nav is sticky and sits in-flow as
+         body's real last child, it occupies its own space directly --
+         any padding-bottom here would just add empty space *below* the
+         bar instead, since it'd land after the bar in the box model.
+         The bar's own env(safe-area-inset-bottom) padding already covers
+         the home-indicator/gesture-area clearance that used to need
+         accounting for here. */
+      body { padding-bottom: 0; }
     }
     @media (max-width: 420px) {
-      body { padding-bottom: calc(16px + 64px + env(safe-area-inset-bottom)); }
+      body { padding-bottom: 0; }
       .layout {
-        min-height: calc(100svh - (16px + env(safe-area-inset-top)) - 36px - 20px - (16px + 64px + env(safe-area-inset-bottom)));
+        min-height: calc(100svh - (16px + env(safe-area-inset-top)) - 36px - 20px - (64px + env(safe-area-inset-bottom)));
       }
     }
 
     .bottom-nav {
       display: none;
-      position: fixed;
+      /* sticky, not fixed -- confirmed directly (screen recording) the bar
+         was visibly jumping/judder-ing while scrolling on real Android
+         Chrome. svh (see body/.layout below) only fixed the page's own
+         height continuously recalculating as Chrome's address bar
+         collapses mid-scroll; it didn't touch this. position:fixed's
+         bounding box is itself computed against that same
+         actively-resizing viewport, independent of any CSS length unit --
+         a real, still-open Chromium behavior (browser address bar
+         literally shifts a fixed element's bounding box during the
+         collapse animation). sticky is computed against the normal
+         document flow instead (tied to real scroll position, not a
+         resizing viewport rect), so it isn't affected by that transition
+         at all. It's now body's last real in-flow child (everything
+         between it and .layout -- .snackbar, .install-banner, the player
+         modals -- is itself position:fixed, so none of them take up flow
+         space); see the updated body/.layout spacing below, which used to
+         reserve room for this as an out-of-flow overlay and now doesn't
+         need to. */
+      position: sticky;
       left: 0; right: 0; bottom: 0;
       z-index: 250; /* below the fullscreen player overlay (300), so expanding it naturally covers this instead of needing extra coordination */
       /* Translucent + blurred (frosted glass) instead of a flat opaque
