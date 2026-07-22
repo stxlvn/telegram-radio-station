@@ -392,12 +392,6 @@
       position: fixed;
       left: 0; right: 0; bottom: 0;
       z-index: 250; /* below the fullscreen player overlay (300), so expanding it naturally covers this instead of needing extra coordination */
-      /* Own compositor layer for the slide-out/in transform below (see
-         .nav-scroll-hidden and the scroll-hide script near the
-         tab-switching code) -- transform-only updates stay smooth
-         because they're compositor-thread, not main-thread layout. */
-      will-change: transform;
-      transition: transform 0.25s ease;
       /* Translucent + blurred (frosted glass) instead of a flat opaque
          fill, per request -- lets a hint of whatever's scrolled
          underneath show through instead of a hard-edged solid bar.
@@ -409,15 +403,6 @@
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       padding-bottom: env(safe-area-inset-bottom);
-    }
-    /* Slid fully off-screen while scrolling down (see the scroll-hide
-       script) instead of trying to keep it glued in place during it --
-       whatever the browser's address-bar transition does to a fixed
-       element happens off-screen, invisible. Slides back in on scroll-up
-       on its own clean transition, nothing fighting the browser's own
-       async scroll timing. */
-    .bottom-nav.nav-scroll-hidden {
-      transform: translateY(100%);
     }
     /* Fades the page content into the bar's own translucent color over a
        short span instead of ending sharply right at its top edge --
@@ -3885,49 +3870,6 @@
       buttons.forEach((btn) => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tabTarget));
       });
-    })();
-  </script>
-
-  <script>
-    (function () {
-      // Three earlier attempts at the mobile-scroll jitter (dvh->svh,
-      // position:sticky -- reverted, it broke width/overlap outright --
-      // then a Visual Viewport API correction via transform) all failed
-      // on real-device testing, and research after the third pointed to
-      // why: Android's asynchronous scrolling (the compositor thread
-      // scrolls independently of the main JS thread) means *any*
-      // script-driven position update in response to scrolling lags
-      // behind and visibly flickers -- a documented, acknowledged
-      // limitation on both Chrome and Firefox for Android, not something
-      // fixable by trying yet another positioning scheme or a smarter
-      // correction formula. Firefox for Android additionally just defers
-      // repositioning fixed elements until scrolling fully stops rather
-      // than tracking the address bar at all, per Mozilla's own bug
-      // tracker -- an open, unfixed bug on their end.
-      // Given that, this sidesteps the problem instead of fighting it:
-      // hide the bar on scroll-down (so whatever jitter/snap the
-      // browser's address-bar transition causes happens while it's
-      // off-screen and invisible), and slide it back in on scroll-up --
-      // the standard mobile show-on-scroll-up pattern, per request. A
-      // small threshold (5px) avoids toggling on sub-pixel scroll noise;
-      // always shown right at the top of the page regardless of the last
-      // direction.
-      const nav = document.querySelector('.bottom-nav');
-      if (!nav) return;
-      let lastScrollY = window.scrollY;
-      function onScroll() {
-        const currentY = window.scrollY;
-        const delta = currentY - lastScrollY;
-        if (currentY <= 0) {
-          nav.classList.remove('nav-scroll-hidden');
-        } else if (delta > 5) {
-          nav.classList.add('nav-scroll-hidden');
-        } else if (delta < -5) {
-          nav.classList.remove('nav-scroll-hidden');
-        }
-        lastScrollY = currentY;
-      }
-      window.addEventListener('scroll', onScroll, { passive: true });
     })();
   </script>
 
