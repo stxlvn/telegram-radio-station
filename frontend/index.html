@@ -2226,6 +2226,23 @@
     </button>
   </div>
 
+  <!-- Mutually exclusive with #install-banner above -- that one only ever
+       shows outside standalone mode, this one only inside it. -->
+  <div id="update-banner" class="install-banner">
+    <svg class="install-banner-icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"></path></svg>
+    <div class="install-banner-body">
+      <div class="install-banner-title">Доступно обновление</div>
+      <div class="install-banner-text">Установлена старая версия приложения. Обновите, чтобы получить последние изменения.</div>
+      <div class="install-banner-actions">
+        <a href="/downloads/your-radio.apk" class="install-banner-install">Скачать обновление</a>
+        <button type="button" class="install-banner-dismiss">Не сейчас</button>
+      </div>
+    </div>
+    <button type="button" id="update-banner-close" class="install-banner-close" title="Закрыть" aria-label="Закрыть">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+    </button>
+  </div>
+
   <!-- Body-level, not nested inside #player-inline -- that element's own
        transform (see the entrance-animation cleanup JS) makes it the
        containing block for any position:fixed descendant, and its
@@ -2471,6 +2488,47 @@
       return window.matchMedia('(display-mode: standalone)').matches
         || window.navigator.standalone === true; // iOS's own (non-standard) flag
     }
+
+    // Bumped by hand alongside app/build.gradle's versionCode on every TWA
+    // rebuild -- there's no build step tying the two together, so this can
+    // drift if a rebuild forgets it (harmless either way: worst case is a
+    // missed or a false-positive update prompt, never breakage).
+    const LATEST_TWA_VERSION = 4;
+    const UPDATE_BANNER_DISMISSED_KEY = 'updateBannerDismissedForVersion';
+
+    // TWA has no JS bridge back to the native app, so there's no direct way
+    // to ask "what versionCode is actually installed" -- LauncherActivity's
+    // getLaunchingUrl() override appends ?twa_version=N to the start_url
+    // on every cold launch instead, which is the only channel available.
+    // Only ever present right after a fresh app launch, so this only runs
+    // once per cold start, not on every resume -- good enough for an update
+    // nudge.
+    function maybeShowUpdateBanner() {
+      if (!isRunningStandalone()) return;
+      const params = new URLSearchParams(location.search);
+      const installedRaw = params.get('twa_version');
+      if (installedRaw === null) return;
+      // One-shot signal from the native launcher -- strip it so it doesn't
+      // linger in the visible URL or get carried along if the page is
+      // shared/reloaded.
+      params.delete('twa_version');
+      const newSearch = params.toString();
+      history.replaceState(null, '', location.pathname + (newSearch ? '?' + newSearch : '') + location.hash);
+      const installed = parseInt(installedRaw, 10);
+      if (!Number.isFinite(installed) || installed >= LATEST_TWA_VERSION) return;
+      const dismissedFor = parseInt(localStorage.getItem(UPDATE_BANNER_DISMISSED_KEY) || '0', 10);
+      if (dismissedFor >= LATEST_TWA_VERSION) return;
+      const banner = document.getElementById('update-banner');
+      function dismiss() {
+        banner.classList.remove('visible');
+        localStorage.setItem(UPDATE_BANNER_DISMISSED_KEY, String(LATEST_TWA_VERSION));
+      }
+      banner.querySelector('.install-banner-install').addEventListener('click', () => dismiss());
+      banner.querySelector('.install-banner-dismiss').addEventListener('click', dismiss, { once: true });
+      document.getElementById('update-banner-close').addEventListener('click', dismiss, { once: true });
+      banner.classList.add('visible');
+    }
+    maybeShowUpdateBanner();
 
     function maybeShowInstallBanner() {
       if (localStorage.getItem(INSTALL_BANNER_DISMISSED_KEY)) return;
