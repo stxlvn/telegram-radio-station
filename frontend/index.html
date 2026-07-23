@@ -419,19 +419,33 @@
          zeroed on the sides (kept top/bottom) so its children fill that
          box edge to edge exactly like the others do. */
       #queue-panel { max-width: 320px; padding-left: 0; padding-right: 0; }
-      /* Two rounds of shrinking padding/font-size/gaps to fit a 5th
-         queue row (row-level, then card/panel/gap-level too) made the
-         whole tab read as too cramped overall -- reverted all of it back
-         to the original spacing. The actual fix for a longer queue is
-         this max-height + internal scroll instead: past roughly 5 rows'
-         worth of height, the list scrolls on its own rather than the
-         whole tab needing to shrink to fit however many happen to be
-         queued. overscroll-behavior:contain keeps that internal scroll
-         from bubbling up into body's own overflow (see the
-         document-scroll-lock rule above) once the list itself hits its
-         own top/bottom edge. */
-      .queue-list {
-        max-height: 300px;
+      /* A fixed max-height on .queue-list (tried first) meant the *page*
+         still scrolled to reach it whenever the address bar was taking
+         up extra space, since .layout itself had no ceiling -- flexbox
+         only shrinks a box down to make room for a sibling when the
+         shared parent is itself height-bound; nothing was actually
+         bounding .layout. Giving .layout a real max-height (mirroring
+         its own min-height formula, so it's exactly the space actually
+         left after body's padding/top-bar/gap/bottom-nav reservation,
+         not a moment more) is what makes the rest of this chain matter:
+         .main-cards never shrinks (flex-shrink:0, always its natural
+         size), #queue-panel and its heading give up their own implicit
+         flex min-height floor (min-height:0, flex-shrink:0 on the
+         heading) so only .queue-list-wrap -- flex:1, so it only ever
+         gets "whatever's actually left" -- ends up absorbing the
+         compression and scrolling internally. Confirmed directly
+         (headless render, real queue data, short viewport standing in
+         for the address bar being shown) before shipping this. */
+      .layout {
+        max-height: calc(100svh - (24px + env(safe-area-inset-top)) - 36px - 20px - (24px + 64px + env(safe-area-inset-bottom)));
+        overflow: hidden;
+      }
+      .main-cards { flex-shrink: 0; }
+      #queue-panel { min-height: 0; }
+      .queue-panel h2 { flex-shrink: 0; }
+      .queue-list-wrap {
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
@@ -492,6 +506,7 @@
       body { padding-bottom: calc(16px + 64px + env(safe-area-inset-bottom)); }
       .layout {
         min-height: calc(100svh - (16px + env(safe-area-inset-top)) - 36px - 20px - (16px + 64px + env(safe-area-inset-bottom)));
+        max-height: calc(100svh - (16px + env(safe-area-inset-top)) - 36px - 20px - (16px + 64px + env(safe-area-inset-bottom)));
       }
     }
 
