@@ -401,7 +401,7 @@
          single guessed number that only happens to work for one device. */
       .card-about .avatar-container {
         width: min(124px, 18vh); height: min(124px, 18vh);
-        margin: 0 auto min(20px, 2.5vh);
+        margin: 0 auto min(8px, 1vh);
       }
       .card-about .site-logo { height: clamp(32px, 8.5vw, 50px); margin-bottom: min(6px, 1vh); }
       .card-about .subtitle { margin-bottom: min(15px, 2vh); }
@@ -652,7 +652,7 @@
     }
 
     .avatar-container {
-      width: 148px; height: 148px; margin: 0 auto 24px; border-radius: 50%;
+      width: 148px; height: 148px; margin: 0 auto 10px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       transition: transform 0.4s var(--md-sys-motion-easing-emphasized);
     }
@@ -2012,7 +2012,7 @@
   <div class="main-cards">
   <div class="m3-card card-about" data-tab="about" id="card-about">
     <div class="avatar-container stagger-item delay-1">
-      <img src="/avatar.jpg" alt="Your Radio">
+      <img src="/avatar.png" alt="Your Radio">
     </div>
     <img class="site-logo stagger-item delay-2" src="/logo.png" alt="Your Radio">
     <div class="subtitle stagger-item delay-3">От ретро-хитов до свежих релизов</div>
@@ -3467,7 +3467,7 @@
         artist: playerArtist.textContent || 'Your Radio',
         album: 'Your Radio',
         artwork: [
-          { src: playerCover.src || '/avatar.jpg' }
+          { src: playerCover.src || '/avatar.png' }
         ]
       });
     }
@@ -3631,7 +3631,7 @@
           setTimeout(() => {
             setMarqueeText(npTitle, data.title || 'Неизвестный трек');
             setMarqueeText(npArtist, data.artist || 'Your Radio');
-            npCover.src = data.cover || '/avatar.jpg';
+            npCover.src = data.cover || '/avatar.png';
             npDurationEl.textContent = npDuration ? formatTime(npDuration) : '--:--';
             npElapsedEl.textContent = '0:00';
             npProgressFill.style.width = '0%';
