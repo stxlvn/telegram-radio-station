@@ -450,6 +450,29 @@
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
+        /* Same approach as .queue-description-text's fade-top/fade-bottom
+           (see there for why mask-image over a background-gradient) --
+           toggled by updateQueueListFade() based on real scroll position,
+           so a track only fades where there's actually more clipped
+           content past that edge instead of a hard cut. */
+        -webkit-mask-image: none;
+        mask-image: none;
+      }
+      .queue-list-wrap.fade-top {
+        -webkit-mask-image: linear-gradient(to bottom, transparent, black 24px);
+        mask-image: linear-gradient(to bottom, transparent, black 24px);
+      }
+      .queue-list-wrap.fade-bottom {
+        -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent);
+        mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent);
+      }
+      .queue-list-wrap.fade-top.fade-bottom {
+        -webkit-mask-image: linear-gradient(
+          to bottom, transparent, black 24px, black calc(100% - 24px), transparent
+        );
+        mask-image: linear-gradient(
+          to bottom, transparent, black 24px, black calc(100% - 24px), transparent
+        );
       }
       /* .side-links was center-aligned, everything else in this tab is
          left-aligned against that shared 320px box. !important since its
@@ -2651,30 +2674,22 @@
 
     adminLink.addEventListener('click', (e) => {
       e.preventDefault();
+      // Used to poll the popup's body for "Authorization Required" and
+      // auto-close it on a "failed" login -- except the browser paints
+      // that same 401 error body underneath its own native Basic Auth
+      // prompt the instant the response arrives, well before the prompt
+      // is dismissed either way. The 400ms poll was closing the popup (and
+      // whatever native dialog it owned) out from under the user before
+      // they had any real chance to type credentials -- confirmed
+      // directly (still failed in a clean incognito profile with site
+      // data cleared, ruling out a remembered/cached auth cancellation).
+      // Just open it and leave the browser's own auth flow alone; a
+      // genuinely cancelled prompt just leaves the plain 401 page sitting
+      // in that tab, which is a minor rough edge, not a blocked login.
       const popup = window.open(adminLink.href, '_blank');
       if (!popup) {
         showSnackbar('Не удалось открыть панель — проверьте блокировку всплывающих окон');
-        return;
       }
-      const deadline = Date.now() + 15000;
-      const poll = setInterval(() => {
-        if (popup.closed || Date.now() > deadline) {
-          clearInterval(poll);
-          return;
-        }
-        let bodyText = '';
-        try {
-          bodyText = (popup.document && popup.document.body && popup.document.body.innerText) || '';
-        } catch (err) {
-          // Cross-origin or not yet loaded -- try again next tick.
-          return;
-        }
-        if (bodyText.includes('Authorization Required')) {
-          popup.close();
-          clearInterval(poll);
-          showSnackbar('Вход не выполнен: логин или пароль не введены или указаны неверно');
-        }
-      }, 400);
     });
 
     function updateSeekControlsUI() {
@@ -3747,6 +3762,24 @@
     }
 
     const queueList = document.getElementById('queue-list');
+    const queueListWrap = document.querySelector('.queue-list-wrap');
+
+    // Same real-scroll-position approach as updateDescriptionFade.
+    function updateQueueListFade() {
+      const el = queueListWrap;
+      const hasAbove = el.scrollTop > 2;
+      const hasBelow = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
+      el.classList.toggle('fade-top', hasAbove);
+      el.classList.toggle('fade-bottom', hasBelow);
+    }
+    queueListWrap.addEventListener('scroll', updateQueueListFade);
+    window.addEventListener('resize', updateQueueListFade);
+    // switchTab (separate script block below) needs this too -- the wrap
+    // sits at clientHeight:0 while its tab is hidden, so whatever the fade
+    // classes were left at from the last time it was visible can be stale
+    // by the time it's shown again.
+    window.updateQueueListFade = updateQueueListFade;
+
     const playerNextWrap = document.getElementById('player-next');
     const playerNextTrackEl = document.getElementById('player-next-track');
     const playerQueueToggle = document.getElementById('player-queue-toggle');
@@ -3928,6 +3961,7 @@
         lastQueueItems = items;
         if (!items.length) {
           updateQueueList(queueList, items);
+          updateQueueListFade();
           queuePanel.classList.remove('visible');
           playerNextWrap.classList.remove('visible');
           closeQueuePanel();
@@ -3935,6 +3969,7 @@
           return;
         }
         updateQueueList(queueList, items);
+        updateQueueListFade();
         queuePanel.classList.add('visible');
         const next = items[0];
         const nextTitle = next.title || 'Неизвестный трек';
@@ -4074,6 +4109,7 @@
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             targets.forEach((el) => el.classList.add('tab-fade-in'));
+            if (name === 'radio' && window.updateQueueListFade) window.updateQueueListFade();
           });
         });
       }
