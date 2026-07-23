@@ -5,9 +5,11 @@ import json
 import re
 import uuid
 import socket
+import asyncio
 
 from flask import Flask, request, redirect, url_for, render_template_string, flash
 from werkzeug.middleware.proxy_fix import ProxyFix
+from telethon import TelegramClient
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -23,6 +25,43 @@ liquidsoap_socket = os.environ.get("LIQUIDSOAP_SOCKET_PATH", "/run/liquidsoap-ra
 app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024  # generous cap for a handful of lossless files at once
 
 ALLOWED_EXT = {".mp3", ".flac", ".m4a", ".ogg", ".wav", ".aac"}
+
+# Optional -- only needed for the "add by channel link" form. Left as
+# os.environ.get() rather than the bracket access queue_filler.py uses for
+# these same names, so this app still starts fine on a host that hasn't
+# been given the systemd EnvironmentFile yet; the route itself checks and
+# flashes a clear error instead of the whole app failing to boot.
+telegram_api_id = os.environ.get("TELEGRAM_API_ID")
+telegram_api_hash = os.environ.get("TELEGRAM_API_HASH")
+telegram_channel = os.environ.get("TELEGRAM_CHANNEL")
+# A dedicated session file, not queue_filler.py's live one -- confirmed
+# directly (earlier incident) that two Telethon clients sharing one
+# .session file at the same time is a real, live footgun, not a
+# theoretical one. This is a plain file copy of an already-authorized
+# session (see the deploy notes), never a fresh interactive login here.
+telegram_admin_session_path = os.environ.get("TELEGRAM_ADMIN_SESSION_PATH", "/opt/radio/session_admin")
+
+# Accepts a full message link (https://t.me/<channel>/<id>, with or
+# without a leading https://, with or without "www."), or just the bare
+# numeric message ID for anyone who already knows it. Validates the
+# channel name in a full link matches the configured channel rather than
+# silently accepting a link to a different chat entirely.
+TELEGRAM_LINK_RE = re.compile(r"(?:https?://)?(?:www\.)?t\.me/([A-Za-z0-9_]+)/(\d+)")
+
+
+def parse_telegram_link(text):
+    text = (text or "").strip()
+    if not text:
+        return None, "Ссылка не указана"
+    if text.isdigit():
+        return int(text), None
+    m = TELEGRAM_LINK_RE.search(text)
+    if not m:
+        return None, "Не похоже на ссылку вида t.me/<канал>/<id>"
+    link_channel, msg_id = m.group(1), m.group(2)
+    if telegram_channel and link_channel.lower() != telegram_channel.lower():
+        return None, f"Ссылка на другой канал (@{link_channel}), а не @{telegram_channel}"
+    return int(msg_id), None
 
 
 def liquidsoap_command(cmd, timeout=5):
@@ -206,10 +245,11 @@ PAGE_TEMPLATE = """
   .item .remove-btn:hover { background: var(--primary-container); color: var(--primary); }
   .locked .remove-btn { opacity: 1; }
   label { display: block; font-size: 0.85rem; color: var(--on-surface-variant); margin: 14px 0 6px; }
-  input[type=file], select, input[type=text] {
+  input[type=file], select, input[type=text], textarea {
     width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px; padding: 10px 12px; color: var(--on-surface); font-size: 0.9rem;
   }
+  textarea { font-family: inherit; resize: vertical; }
   /* color-scheme:dark on <html> makes most browsers render the dropdown
      list natively dark, but that's a hint, not a guarantee -- pin the
      option colors explicitly too so it can't fall back to a light native
@@ -244,6 +284,10 @@ PAGE_TEMPLATE = """
     background: rgba(255,255,255,0.08); color: var(--on-surface); font-weight: 600; cursor: pointer; display: none;
   }
   .upload-modal-close.visible { display: block; }
+  .add-link-divider {
+    text-align: center; margin: 18px 0; color: var(--on-surface-variant);
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
 </style>
 </head>
 <body>
@@ -313,6 +357,23 @@ PAGE_TEMPLATE = """
       </select>
 
       <button type="submit">Загрузить и поставить в очередь</button>
+    </form>
+
+    <div class="add-link-divider">или</div>
+
+    <form id="add-link-form">
+      <label>Ссылки на сообщения в канале, по одной на строку (t.me/{{ telegram_channel or '...' }}/12345)</label>
+      <textarea name="channel_links" required rows="4" placeholder="https://t.me/{{ telegram_channel or 'channel' }}/12345&#10;https://t.me/{{ telegram_channel or 'channel' }}/12346&#10;..." id="channel-links-input"></textarea>
+
+      <label>Куда поставить (первую ссылку; дальше по порядку, друг за другом)</label>
+      <select name="after" id="after-select-link">
+        <option value="__front__">Играть следующим (сразу после того, что уже нельзя переставить)</option>
+        {% for it in queue_items %}
+          <option value="{{ it.id }}">После «{{ it.title }}» ({{ loop.index }} в очереди)</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" id="add-link-submit">Найти в канале и поставить в очередь</button>
     </form>
   </div>
   </div>
@@ -532,6 +593,72 @@ PAGE_TEMPLATE = """
     });
 
     uploadClose.addEventListener('click', () => uploadOverlay.classList.remove('visible'));
+
+    // Several links submit as separate requests in sequence (not all at
+    // once -- a Telegram flood-wait from hammering it concurrently would
+    // be a worse failure mode than just taking longer), each one only
+    // starting once the previous has actually finished downloading. That
+    // sequencing is also what makes a real, per-track progress readout
+    // possible at all, reusing the same overlay markup as file uploads.
+    const addLinkForm = document.getElementById('add-link-form');
+    const addLinkSubmit = document.getElementById('add-link-submit');
+    const channelLinksInput = document.getElementById('channel-links-input');
+    const afterSelectLink = document.getElementById('after-select-link');
+
+    addLinkForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const links = channelLinksInput.value.split('\n').map((s) => s.trim()).filter(Boolean);
+      if (!links.length) return;
+
+      showUploadModal();
+      uploadTitle.textContent = 'Добавляю треки из канала...';
+
+      // Each successful add's own id becomes the "after" for the next
+      // link in the batch, so a multi-link paste lands in the queue in
+      // the same top-to-bottom order it was pasted in, each one right
+      // after the last, rather than every link competing for the same
+      // single insertion point.
+      let afterId = afterSelectLink.value;
+      const results = [];
+      for (let i = 0; i < links.length; i++) {
+        uploadSub.textContent = `Ищу трек ${i + 1} из ${links.length} в канале` +
+          (links.length > 1 ? ' (большие lossless-файлы могут занять время)' : '') + '...';
+        try {
+          const res = await fetch('add_by_link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ link: links[i], after: afterId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            results.push({ ok: true, title: data.title, artist: data.artist });
+            afterId = data.id;
+          } else {
+            results.push({ ok: false, link: links[i], error: data.error || 'неизвестная ошибка' });
+          }
+        } catch (err) {
+          results.push({ ok: false, link: links[i], error: 'ошибка сети' });
+        }
+        const pct = Math.round(((i + 1) / links.length) * 100);
+        uploadFill.style.width = pct + '%';
+        uploadText.textContent = pct + '%';
+      }
+
+      const okResults = results.filter((r) => r.ok);
+      const failed = results.filter((r) => !r.ok);
+      uploadTitle.textContent = failed.length ? 'Готово с ошибками' : 'Готово';
+      uploadSub.textContent = `Добавлено: ${okResults.length} из ${links.length}` +
+        (okResults.length ? ' — ' + okResults.map((r) => r.title).join(', ') : '') +
+        (failed.length ? '. Не удалось: ' + failed.map((f) => f.link + ' (' + f.error + ')').join('; ') : '');
+      if (failed.length) {
+        uploadSub.classList.add('error');
+        uploadClose.classList.add('visible');
+      } else {
+        setTimeout(() => uploadOverlay.classList.remove('visible'), 1500);
+      }
+      addLinkForm.reset();
+      refreshState();
+    });
   </script>
 </body>
 </html>
@@ -564,7 +691,9 @@ def no_cache(response):
 @app.route("/", methods=["GET"])
 def index():
     cache_items, queue_items = current_state()
-    return render_template_string(PAGE_TEMPLATE, cache_items=cache_items, queue_items=queue_items)
+    return render_template_string(
+        PAGE_TEMPLATE, cache_items=cache_items, queue_items=queue_items, telegram_channel=telegram_channel
+    )
 
 
 @app.route("/state.json", methods=["GET"])
@@ -660,6 +789,32 @@ def skip():
         return {"ok": False, "error": str(e)}, 500
 
 
+def compute_insert_base_mtime(after_id):
+    # Anchor point: everything currently in queue_dir, keyed by its mtime,
+    # excluding whatever we're about to add ourselves. Shared by both the
+    # file-upload and add-by-link routes -- same "where do new items land"
+    # rule regardless of how the track got here.
+    existing = queue_dir_files()
+    mtimes = [os.path.getmtime(os.path.join(queue_dir, f)) for f in existing]
+
+    if not existing:
+        return time.time()
+    if after_id == "__front__":
+        return mtimes[0] - 2
+    match_idx = None
+    for i, fn in enumerate(existing):
+        if fn == f"{after_id}.audio":
+            match_idx = i
+            break
+    if match_idx is None:
+        # Track played or vanished between page load and submit -- fall
+        # back to the front rather than losing the addition.
+        return mtimes[0] - 2
+    if match_idx == len(existing) - 1:
+        return mtimes[match_idx] + 2
+    return (mtimes[match_idx] + mtimes[match_idx + 1]) / 2
+
+
 @app.route("/upload", methods=["POST"])
 def upload():
     files = [f for f in request.files.getlist("audio_files") if f and f.filename]
@@ -675,32 +830,7 @@ def upload():
 
     os.makedirs(queue_dir, exist_ok=True)
     after_id = request.form.get("after", "__front__").strip()
-
-    # Anchor point: everything currently in queue_dir, keyed by its mtime,
-    # excluding whatever we're about to add ourselves.
-    existing = queue_dir_files()
-    mtimes = [os.path.getmtime(os.path.join(queue_dir, f)) for f in existing]
-
-    if not existing:
-        base_mtime = time.time()
-        gap_before, gap_after = None, None
-    elif after_id == "__front__":
-        base_mtime = mtimes[0] - 2
-        gap_before, gap_after = base_mtime - 2, mtimes[0]
-    else:
-        match_idx = None
-        for i, fn in enumerate(existing):
-            if fn == f"{after_id}.audio":
-                match_idx = i
-                break
-        if match_idx is None:
-            # Track played or vanished between page load and submit -- fall
-            # back to the front rather than losing the upload.
-            base_mtime = mtimes[0] - 2
-        elif match_idx == len(existing) - 1:
-            base_mtime = mtimes[match_idx] + 2
-        else:
-            base_mtime = (mtimes[match_idx] + mtimes[match_idx + 1]) / 2
+    base_mtime = compute_insert_base_mtime(after_id)
 
     added_titles = []
     # Multiple files land as consecutive mtimes right after each other, in
@@ -729,6 +859,81 @@ def upload():
 
     flash(f"Добавлено треков: {len(added_titles)} — " + ", ".join(added_titles), "success")
     return redirect(url_for("index"))
+
+
+async def _fetch_channel_track(message_id, tmp_path):
+    client = TelegramClient(telegram_admin_session_path, int(telegram_api_id), telegram_api_hash)
+    await client.start()
+    try:
+        msg = await client.get_messages(telegram_channel, ids=message_id)
+        if msg is None:
+            return None, "Сообщение не найдено (удалено или неверный id)"
+        if not (msg.audio or msg.voice):
+            return None, "В этом сообщении нет аудио"
+        file_title = getattr(msg.file, "title", None) or ""
+        file_performer = getattr(msg.file, "performer", None) or ""
+        file_name = getattr(msg.file, "name", None) or ""
+        path = await client.download_media(msg, file=tmp_path)
+        if not path:
+            return None, "Не удалось скачать файл"
+        return {"file_title": file_title, "file_performer": file_performer, "file_name": file_name}, None
+    finally:
+        await client.disconnect()
+
+
+@app.route("/add_by_link", methods=["POST"])
+def add_by_link():
+    # JSON in, JSON out -- not a redirect+flash like /upload, since the
+    # frontend now submits several links one at a time in sequence (see
+    # the script below) to drive a real per-track progress indicator, the
+    # same reason /reorder and /remove are JSON endpoints already.
+    if not (telegram_api_id and telegram_api_hash and telegram_channel):
+        return {"ok": False, "error": "Добавление по ссылке не настроено на сервере (нет TELEGRAM_* переменных)"}, 400
+
+    data = request.get_json(silent=True) or {}
+    message_id, err = parse_telegram_link(data.get("link", ""))
+    if err:
+        return {"ok": False, "error": err}, 400
+
+    os.makedirs(queue_dir, exist_ok=True)
+    new_id = f"admin-{int(time.time())}-{uuid.uuid4().hex[:6]}"
+    tmp_path = os.path.join(queue_dir, f"{new_id}.audio.part")
+    final_path = os.path.join(queue_dir, f"{new_id}.audio")
+
+    try:
+        info, err = asyncio.run(_fetch_channel_track(message_id, tmp_path))
+    except Exception as e:
+        print(f"add_by_link failed: {e}", file=sys.stderr)
+        info, err = None, f"Ошибка Telegram: {e}"
+
+    if err:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return {"ok": False, "error": err}, 400
+
+    artist, title = extract_tags(tmp_path)
+    if not artist:
+        artist = info["file_performer"]
+    if not title:
+        title = info["file_title"] or info["file_name"]
+    title = title or "Неизвестный трек"
+    artist = artist or "MusicmaniA"
+
+    link = f"https://t.me/{telegram_channel}/{message_id}"
+    meta = {"id": new_id, "artist": artist, "title": title, "link": link}
+    with open(os.path.join(queue_dir, f"{new_id}.json"), "w") as mf:
+        json.dump(meta, mf)
+    os.replace(tmp_path, final_path)
+
+    # "after" resolved fresh for every link in the batch (not just once up
+    # front) -- each successive track should land right after the one the
+    # batch itself just placed, so a multi-link paste ends up in the same
+    # top-to-bottom order it was pasted in, not all piled at the same spot.
+    after_id = str(data.get("after", "__front__")).strip()
+    base_mtime = compute_insert_base_mtime(after_id)
+    os.utime(final_path, (base_mtime, base_mtime))
+
+    return {"ok": True, "id": new_id, "title": title, "artist": artist}
 
 
 if __name__ == "__main__":
