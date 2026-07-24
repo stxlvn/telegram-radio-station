@@ -1955,17 +1955,18 @@
          changed the mobile stack too (mobile keeps .player-inline-body a
          real block, untouched).
 
-         Row 1 is a 1fr spacer, so whatever height the cover has beyond
-         its column's own stack collects above that stack -- landing its
-         last row (the YouTube button) flush with the cover's bottom
-         edge instead of floating somewhere in the middle of it. */
+         Rows 2 and 4 are 1fr spacers, so the surplus height from the
+         cover splits evenly on both sides of the transport: the
+         listeners line sits on the cover's top edge, the stream-format
+         buttons on its bottom edge, and the transport lands exactly
+         midway between them rather than bunched against either. */
       .player-inline {
         display: grid !important;
         /* 360, not 380: the cover is what sets this column's height, and
            the whole page has to clear a 1366x768 laptop viewport without
            scrolling -- measured 11px over at 380. */
         grid-template-columns: 360px minmax(0, 1fr);
-        grid-template-rows: 1fr auto auto auto auto auto auto auto auto;
+        grid-template-rows: auto 1fr auto 1fr auto auto auto auto auto auto;
         column-gap: 40px;
         align-items: start;
         max-height: none !important;
@@ -1975,7 +1976,7 @@
         text-align: left;
       }
       .player-inline-body { display: contents; }
-      .player-cover-wrap { max-width: none; margin: 0; grid-column: 1; grid-row: 1 / span 5; }
+      .player-cover-wrap { max-width: none; margin: 0; grid-column: 1; grid-row: 1 / span 6; }
       /* Right of the cover: transport, then the stream-format controls
          directly under it. */
       /* No .player-status rule here on purpose: desktop used to opt it
@@ -1987,8 +1988,8 @@
          right edge -- the transport keeps its base space-between so the
          copy-link and volume buttons land on that edge rather than
          bunching up on the left of an otherwise empty row. */
-      .player-meta-row  { grid-column: 2; grid-row: 2; justify-content: flex-start; }
-      .player-controls  { grid-column: 2; grid-row: 3; width: 100%; justify-content: space-between; }
+      .player-meta-row  { grid-column: 2; grid-row: 1; justify-content: flex-start; font-size: 0.9rem; margin-bottom: 0; }
+      .player-controls  { grid-column: 2; grid-row: 3; width: 100%; justify-content: space-between; margin-bottom: 0; }
       /* All five buttons spaced evenly edge to edge. They can't be, while
          the middle three sit inside .player-controls-center -- that makes
          the row three flex items, so space-between only ever gave the
@@ -2002,17 +2003,17 @@
         width: 100%;
         max-width: none;
       }
-      .stream-block     { grid-row: 4; }
-      .video-toggle-row { grid-row: 5; }
+      .stream-block     { grid-row: 5; }
+      .video-toggle-row { grid-row: 6; }
       /* Full width underneath both columns: what's playing, then how far
          through it we are. The top margin is what separates this band
          from the cover/transport row above -- the grid's own row gap is
          0 (column-gap only), so without it the title sat flush against
          the cover's bottom edge. */
-      .player-title          { grid-column: 1 / -1; grid-row: 6; margin-top: 30px; }
-      .player-artist         { grid-column: 1 / -1; grid-row: 7; }
-      .player-progress-track { grid-column: 1 / -1; grid-row: 8; }
-      .player-time-row       { grid-column: 1 / -1; grid-row: 9; }
+      .player-title          { grid-column: 1 / -1; grid-row: 7; margin-top: 30px; }
+      .player-artist         { grid-column: 1 / -1; grid-row: 8; }
+      .player-progress-track { grid-column: 1 / -1; grid-row: 9; }
+      .player-time-row       { grid-column: 1 / -1; grid-row: 10; }
 
       /* These four carry a 320px cap plus auto side margins from the old
          narrow-card layout, which left them stranded mid-card while
