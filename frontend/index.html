@@ -1978,16 +1978,25 @@
       .player-cover-wrap { max-width: none; margin: 0; grid-column: 1; grid-row: 1 / span 5; }
       /* Right of the cover: transport, then the stream-format controls
          directly under it. */
-      /* The "Пауза"/"Играет" line is replaced here by the listeners +
-         format row, which says more in the same slot -- the play state is
-         already unambiguous from the play/pause button right below it. */
-      .player-status    { display: none; }
+      /* No .player-status rule here on purpose: desktop used to opt it
+         back in (its base rule is display:none, so it was desktop-only to
+         begin with), and that slot now belongs to the listeners + format
+         row below, which says more in the same space -- play state is
+         already unambiguous from the play/pause button under it. */
       /* All three run the full width of the column, out to the card's
          right edge -- the transport keeps its base space-between so the
          copy-link and volume buttons land on that edge rather than
          bunching up on the left of an otherwise empty row. */
       .player-meta-row  { grid-column: 2; grid-row: 2; justify-content: flex-start; }
       .player-controls  { grid-column: 2; grid-row: 3; width: 100%; justify-content: space-between; }
+      /* All five buttons spaced evenly edge to edge. They can't be, while
+         the middle three sit inside .player-controls-center -- that makes
+         the row three flex items, so space-between only ever gave the
+         outer two (copy link, volume) the whole surplus and left the
+         transport clustered in the middle by its own 28px gaps.
+         display:contents dissolves the wrapper into the row so all five
+         are siblings and the spacing is uniform. */
+      .player-controls-center { display: contents; }
       .stream-block, .video-toggle-row {
         grid-column: 2;
         width: 100%;
@@ -2015,11 +2024,6 @@
       .on-air-label { text-align: left; max-width: none; margin-left: 0; margin-right: 0; }
       .stream-block, .video-toggle-row { margin-left: 0; margin-right: 0; }
       .side-links { max-width: none; margin-left: 0; margin-right: 0; text-align: left; }
-      /* Grouped left with the rest of the column instead of the base
-         space-between, which only made sense when this row was the full
-         width of a narrow card -- across the wider right-hand column it
-         parked the outer two buttons absurdly far from the transport. */
-      .player-controls { justify-content: flex-start; gap: 28px; }
       .player-artist { margin-bottom: 10px; }
       .player-time-row { margin-bottom: 14px; }
       .player-controls { margin-bottom: 10px; }
