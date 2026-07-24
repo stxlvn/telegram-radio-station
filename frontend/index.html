@@ -233,6 +233,29 @@
     }
     .admin-link svg { width: 18px; height: 18px; fill: currentColor; }
 
+    /* Desktop-only (shown in the min-width/hover block far below) -- the
+       same two tabs mobile drives from its bottom nav. Pill-on-active
+       matches .bottom-nav-icon-pill's own secondary-container treatment
+       so both switchers read as the same control in different places. */
+    .top-tabs { display: none; gap: 4px; }
+    .top-tab {
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--md-sys-color-on-surface-variant);
+      padding: 8px 20px;
+      border-radius: 100px;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .top-tab.active {
+      background-color: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+      font-weight: 600;
+    }
+
     .layout {
       display: flex;
       align-items: stretch;
@@ -333,26 +356,31 @@
        system: fixed 80px bar, active item gets a pill-shaped
        secondary-container indicator behind the icon, inactive items sit in
        on-surface-variant. */
+    /* Tab visibility -- global, not per-breakpoint: desktop drives the
+       same two tabs from the TitleBar row (.top-tabs) that mobile drives
+       from its bottom nav, so both sides share one source of truth for
+       which card is showing rather than desktop laying both out side by
+       side and mobile toggling between them.
+
+       !important on both sides of this toggle, not just the hide --
+       confirmed directly this was otherwise silently losing the cascade:
+       .card-about and .queue-panel each set their own unconditional
+       "display: flex" later in this same stylesheet (source order below
+       this block), and an attribute selector like [data-tab] ties with a
+       plain class selector on specificity, so whichever rule is written
+       LATER wins regardless of which one "sounds" more specific to a
+       human reader. Without !important both cards ended up permanently
+       visible together, tab or no tab -- matches #video-toggle-row's
+       existing use of !important further down for the same kind of "must
+       beat a component's own later display rule" problem. */
+    [data-tab] { display: none !important; }
+    body[data-active-tab="about"] .card-about[data-tab="about"] { display: flex !important; }
+    body[data-active-tab="radio"] .card-broadcast[data-tab="radio"] { display: block !important; }
+    /* .queue-panel's own base rule is display:flex (column) -- not
+       block, confirmed by actually reading it rather than assuming from
+       its visual result. */
+    body[data-active-tab="radio"] #queue-panel[data-tab="radio"] { display: flex !important; }
     @media (max-width: 1024px) and (hover: none) {
-      /* !important on both sides of this toggle, not just the hide --
-         confirmed directly this was otherwise silently losing the
-         cascade: .card-about and .queue-panel each set their own
-         unconditional "display: flex" later in this same stylesheet
-         (source order below this block), and an attribute selector like
-         [data-tab] ties with a plain class selector on specificity, so
-         whichever rule is written LATER wins regardless of which one
-         "sounds" more specific to a human reader. Without !important both
-         cards ended up permanently visible together, tab or no tab --
-         matches #video-toggle-row's existing use of !important further
-         down for the same kind of "must beat a component's own later
-         display rule" problem. */
-      [data-tab] { display: none !important; }
-      body[data-active-tab="about"] .card-about[data-tab="about"] { display: flex !important; }
-      body[data-active-tab="radio"] .card-broadcast[data-tab="radio"] { display: block !important; }
-      /* .queue-panel's own base rule is display:flex (column) -- not
-         block, confirmed by actually reading it rather than assuming from
-         its visual result. */
-      body[data-active-tab="radio"] #queue-panel[data-tab="radio"] { display: flex !important; }
       /* The admin-panel login icon lives in .top-bar, outside both tabs'
          containers entirely, so nothing above ever touched it -- it kept
          showing on "Радио" too. Per request, admin access belongs with
@@ -360,7 +388,9 @@
          sets display:flex, same specificity as a plain class selector
          here, so !important again rather than relying on source order. */
       body[data-active-tab="radio"] #admin-link { display: none !important; }
+    }
 
+    @media (max-width: 1024px) and (hover: none) {
       /* Each tab already occupies its own dedicated screen now, so the
          .m3-card "card floating on the page" treatment (its own distinct
          surface-container background/padding-box, meant to visually
@@ -1913,10 +1943,20 @@
     /* OR'd with hover:hover/pointer:fine (a real mouse/trackpad) so a
        desktop Chrome window narrowed by docking DevTools, or just resized
        small, keeps the desktop layout instead of flipping to the
-       touch-oriented mobile one -- matches DESKTOP_QUERY in the script
+       touch-oriented mobile one -- mirrors MOBILE_QUERY in the script
        below. A real touchscreen at >=1025px (large tablet) still lands
        here too, same as before this query gained the OR clause. */
     @media (min-width: 1025px), (hover: hover) and (pointer: fine) {
+      /* TitleBar: logo on the left, its two tabs next to it, admin link
+         pushed to the far right by the auto margin. Keeps .top-bar's own
+         base 1400px ceiling -- the content row below stretches to meet
+         it (see .main-cards/.queue-panel), rather than the bar shrinking
+         down to the content. */
+      .top-bar { justify-content: flex-start; align-items: center; gap: 28px; }
+      .top-bar-title { display: block; height: 30px; }
+      .top-tabs { display: flex; }
+      #admin-link { margin-left: auto; }
+
       #now-playing { display: none !important; }
       .np-actions-row { display: none !important; }
       .player-inline-header { display: none; }
@@ -1955,34 +1995,23 @@
          (falling back to the same no-scroll-lost-content behavior as
          before on short windows). */
       body { justify-content: safe center; }
-      .top-bar { display: contents; }
       .m3-card { padding: 28px 32px; }
       .queue-panel { padding: 18px 20px; }
-      /* Desktop only -- .main-cards is a row here (cardA + cardB side by
-         side), and each .m3-card's width:100% needs a *definite* width to
-         resolve that percentage against or it circularly falls back to a
-         too-small size (measured: both cards stuck at 434px instead of
-         500px). On mobile .main-cards switches to flex-direction:column
-         (single card per row, see the max-width:1024px block), where this
-         same fixed width would just force horizontal overflow instead --
-         confirmed directly, cards were spilling past the viewport edge. */
+      /* Fills whatever .layout's width leaves after the queue panel's
+         fixed 380 + the 20px gap, so the content row spans the same
+         1400px ceiling the TitleBar above it uses instead of sitting as
+         a narrow block centered inside it. flex:1 gives the card a
+         resolved (definite) width to resolve its own width:100% against,
+         which is what the old fixed px width was there for. */
       .main-cards {
-        flex-shrink: 0;
-        width: 1020px;
-        max-width: 1020px;
+        flex: 1;
+        min-width: 0;
       }
-      /* Position is computed in JS (see positionAdminLink) from the queue
-         panel's actual right edge and the player card's actual bottom
-         edge -- both shift with content/viewport width, so a fixed CSS
-         offset can't track them; this just opts the button into
-         fixed-position mode so JS can place it precisely. Desktop only:
-         on the mobile stacked layout "queue's right edge" and "player's
-         bottom edge" aren't a meaningful pair of anchors, so it stays in
-         its original top-bar spot there. */
-      .admin-link {
-        position: fixed;
-        z-index: 40;
-      }
+      .queue-panel { flex: 0 0 380px; }
+      /* .m3-card's own 500px cap would otherwise keep the card itself
+         narrow inside the now-stretched .main-cards, leaving the right
+         half of that row empty. */
+      .m3-card { max-width: none; }
       .player-next { display: none !important; }
     }
 
@@ -2038,6 +2067,13 @@
   </div>
   <div class="top-bar">
     <img class="top-bar-title" src="/logo.png" alt="Your Radio">
+    <!-- Desktop's tab switcher (mobile drives the same two tabs from its
+         bottom nav instead, see .bottom-nav) -- same data-tab-target
+         contract, so one handler covers both. -->
+    <nav class="top-tabs" role="tablist" aria-label="Разделы">
+      <button type="button" class="top-tab active" role="tab" aria-selected="true" aria-controls="card-broadcast queue-panel" data-tab-target="radio">Радио</button>
+      <button type="button" class="top-tab" role="tab" aria-selected="false" aria-controls="card-about" data-tab-target="about">О канале</button>
+    </nav>
     <a href="/admin/" id="admin-link" class="admin-link" title="Панель администратора" aria-label="Панель администратора">
       <svg viewBox="0 0 24 24"><path d="M11 7l-1.41 1.41L12.17 11H2v2h10.17l-2.58 2.59L11 17l5-5zM20 3h-8v2h8v14h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
     </a>
@@ -2629,48 +2665,11 @@
     // side -- doesn't flip a real mouse-driven session into the
     // touch-oriented mobile layout. A real touchscreen at any width still
     // matches the mobile side; a mouse/trackpad at any width stays desktop.
-    const DESKTOP_QUERY = window.matchMedia('(min-width: 1025px), (hover: hover) and (pointer: fine)');
-    function positionAdminLink() {
-      if (!DESKTOP_QUERY.matches) {
-        adminLink.style.left = '';
-        adminLink.style.top = '';
-        return;
-      }
-      const cardRect = cardBroadcast.getBoundingClientRect();
-      // Queue panel collapses (opacity/max-height) when there's no queue
-      // data -- fall back to the player card's own right edge so the
-      // button doesn't jump to some stale/zero-size rect in that case.
-      const queueVisible = queuePanel.classList.contains('visible');
-      const rightEdge = queueVisible ? queuePanel.getBoundingClientRect().right : cardRect.right;
-      const gap = 12;
-      const btnSize = adminLink.getBoundingClientRect().width || 36;
-      // position:fixed coordinates are viewport-relative already, same as
-      // getBoundingClientRect() -- adding window.scrollX/scrollY here was
-      // double-compensating for scroll, pushing the button further off
-      // toward (and eventually past) the bottom of the viewport the more
-      // the page had scrolled when this last ran, which is very likely
-      // why it looked like it had vanished entirely.
-      // Clamped to the viewport's own bottom edge too -- on short windows
-      // (laptop screens with browser chrome eating vertical space) the
-      // card's natural bottom edge can itself sit past the fold, which
-      // pushed the button off-screen the same way the scroll bug did.
-      const maxTop = window.innerHeight - btnSize - gap;
-      adminLink.style.left = (rightEdge - btnSize) + 'px';
-      adminLink.style.top = Math.min(cardRect.bottom + gap, maxTop) + 'px';
-    }
-    window.addEventListener('resize', positionAdminLink);
-    DESKTOP_QUERY.addEventListener('change', positionAdminLink);
-    // Either anchor's box can change height/visibility for reasons that
-    // have nothing to do with a window resize (queue emptying out, the
-    // YouTube-link row toggling on/off, quality info showing/hiding) --
-    // ResizeObserver catches all of those generically instead of hunting
-    // down every individual code path that might affect either box.
-    if (window.ResizeObserver) {
-      const adminLinkObserver = new ResizeObserver(positionAdminLink);
-      adminLinkObserver.observe(cardBroadcast);
-      adminLinkObserver.observe(queuePanel);
-    }
-    positionAdminLink();
+    // Used to be position:fixed on desktop, with its coordinates computed
+    // here every resize/ResizeObserver tick from the queue panel's right
+    // edge and the player card's bottom edge. It now sits in the TitleBar
+    // row in normal flow (pushed right by an auto margin), so there are
+    // no moving anchors left to track and none of that is needed.
 
     adminLink.addEventListener('click', (e) => {
       e.preventDefault();
@@ -3158,7 +3157,7 @@
     const playerCoverWrap = document.querySelector('.player-cover-wrap');
     // hover:none is what actually distinguishes a real touch device from
     // a desktop window that merely got narrow (DevTools docked, manual
-    // resize, etc) -- same reasoning as DESKTOP_QUERY above.
+    // resize, etc) -- same reasoning as the desktop media query above.
     const MOBILE_QUERY = '(max-width: 1024px) and (hover: none)';
     // Matches the (max-width: 1024px) and (max-height: 500px) CSS
     // breakpoint for the side-by-side landscape phone layout -- keyed on
@@ -4079,7 +4078,10 @@
   </nav>
   <script>
     (function () {
-      const buttons = document.querySelectorAll('.bottom-nav-item');
+      // Both switchers at once -- mobile's bottom nav and desktop's
+      // TitleBar tabs. Only one of the two is ever visible, but keeping
+      // both in sync means neither can go stale behind a viewport resize.
+      const buttons = document.querySelectorAll('[data-tab-target]');
       function switchTab(name) {
         document.body.dataset.activeTab = name;
         buttons.forEach((btn) => {
