@@ -1171,17 +1171,16 @@
       overflow: hidden;
       transition: opacity 0.35s ease, max-height 0.35s ease, padding 0.35s ease;
       animation: m3-card-enter var(--md-sys-motion-duration-long2) var(--md-sys-motion-easing-emphasized-decelerate) forwards;
-      /* .layout's align-items:stretch already gives this box the same
-         height as .main-cards -- space-between keeps the description at
-         the top (where it belongs) while pushing .queue-list-wrap all the
-         way down to that stretched box's bottom edge, flush with the
-         player card's, with the leftover space landing as a gap between
-         them instead of dragging the description down too (confirmed
-         directly: justify-content:flex-end pulled the description down
-         with it, leaving blank space above it instead of below). */
+      /* flex-start, not space-between: .layout's align-items:stretch
+         gives this box the player column's full height, and
+         space-between spent all of that surplus as a gap between the
+         description and the queue, pinning "Далее в эфире" to the very
+         bottom edge. Stacking them keeps the queue directly under the
+         description it follows, with the leftover height collecting
+         below both. */
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
     }
     .queue-panel.visible { opacity: 1; max-height: 4000px; }
     .queue-panel h2 {
@@ -1215,7 +1214,12 @@
       line-height: 1.55;
       color: var(--md-sys-color-on-surface-variant);
       white-space: pre-line;
-      height: 290px;
+      /* Visible window only -- the text itself is untouched, it just
+         scrolls (with the fade edges below marking that there's more).
+         Kept short deliberately: this box is what decides how far down
+         "Далее в эфире" starts, and the page is meant to open with no
+         scroll of its own on a common laptop viewport. */
+      height: 190px;
       overflow-y: auto;
       text-align: justify;
       padding-right: 6px;
@@ -1957,8 +1961,11 @@
          edge instead of floating somewhere in the middle of it. */
       .player-inline {
         display: grid !important;
-        grid-template-columns: 380px minmax(0, 1fr);
-        grid-template-rows: 1fr auto auto auto auto auto auto auto auto auto;
+        /* 360, not 380: the cover is what sets this column's height, and
+           the whole page has to clear a 1366x768 laptop viewport without
+           scrolling -- measured 11px over at 380. */
+        grid-template-columns: 360px minmax(0, 1fr);
+        grid-template-rows: 1fr auto auto auto auto auto auto auto auto;
         column-gap: 40px;
         align-items: start;
         max-height: none !important;
@@ -1968,32 +1975,35 @@
         text-align: left;
       }
       .player-inline-body { display: contents; }
-      .player-cover-wrap { max-width: none; margin: 0; grid-column: 1; grid-row: 1 / span 6; }
+      .player-cover-wrap { max-width: none; margin: 0; grid-column: 1; grid-row: 1 / span 5; }
       /* Right of the cover: transport, then the stream-format controls
          directly under it. */
-      .player-status    { grid-column: 2; grid-row: 2; text-align: left; }
+      /* The "Пауза"/"Играет" line is replaced here by the listeners +
+         format row, which says more in the same slot -- the play state is
+         already unambiguous from the play/pause button right below it. */
+      .player-status    { display: none; }
       /* All three run the full width of the column, out to the card's
          right edge -- the transport keeps its base space-between so the
          copy-link and volume buttons land on that edge rather than
          bunching up on the left of an otherwise empty row. */
+      .player-meta-row  { grid-column: 2; grid-row: 2; justify-content: flex-start; }
       .player-controls  { grid-column: 2; grid-row: 3; width: 100%; justify-content: space-between; }
-      .player-meta-row  { grid-column: 2; grid-row: 4; justify-content: flex-start; }
       .stream-block, .video-toggle-row {
         grid-column: 2;
         width: 100%;
         max-width: none;
       }
-      .stream-block     { grid-row: 5; }
-      .video-toggle-row { grid-row: 6; }
+      .stream-block     { grid-row: 4; }
+      .video-toggle-row { grid-row: 5; }
       /* Full width underneath both columns: what's playing, then how far
          through it we are. The top margin is what separates this band
          from the cover/transport row above -- the grid's own row gap is
          0 (column-gap only), so without it the title sat flush against
          the cover's bottom edge. */
-      .player-title          { grid-column: 1 / -1; grid-row: 7; margin-top: 30px; }
-      .player-artist         { grid-column: 1 / -1; grid-row: 8; }
-      .player-progress-track { grid-column: 1 / -1; grid-row: 9; }
-      .player-time-row       { grid-column: 1 / -1; grid-row: 10; }
+      .player-title          { grid-column: 1 / -1; grid-row: 6; margin-top: 30px; }
+      .player-artist         { grid-column: 1 / -1; grid-row: 7; }
+      .player-progress-track { grid-column: 1 / -1; grid-row: 8; }
+      .player-time-row       { grid-column: 1 / -1; grid-row: 9; }
 
       /* These four carry a 320px cap plus auto side margins from the old
          narrow-card layout, which left them stranded mid-card while
@@ -2013,7 +2023,6 @@
       .player-artist { margin-bottom: 10px; }
       .player-time-row { margin-bottom: 14px; }
       .player-controls { margin-bottom: 10px; }
-      .player-status { display: block; }
       /* Common laptop viewports (1366x768 and similar, minus browser
          chrome) are shorter than this page's natural height at the
          original desktop spacing -- the page needed to scroll, and the
