@@ -1988,7 +1988,7 @@
          right edge -- the transport keeps its base space-between so the
          copy-link and volume buttons land on that edge rather than
          bunching up on the left of an otherwise empty row. */
-      .player-meta-row  { grid-column: 1 / -1; grid-row: 8; justify-content: flex-end; font-size: 0.9rem; margin-bottom: 6px; }
+      .player-meta-row  { grid-column: 2; grid-row: 7; justify-content: flex-end; font-size: 0.9rem; margin-bottom: 6px; align-self: end; }
       /* Bigger than the shared base sizes -- this transport is the whole
          point of the page on desktop and now has a full column to itself,
          where the mobile-sized buttons read as undersized. Play gets a
@@ -1996,8 +1996,8 @@
          action among five otherwise equal-weight buttons. */
       .player-ctrl-btn { width: 68px; height: 68px; }
       .player-ctrl-btn svg { width: 38px; height: 38px; }
-      .player-play-btn { width: 104px; height: 104px; }
-      .player-play-btn svg { width: 46px; height: 46px; }
+      .player-play-btn { width: 124px; height: 124px; }
+      .player-play-btn svg { width: 56px; height: 56px; }
       .player-controls  { grid-column: 2; grid-row: 2; width: 100%; justify-content: space-between; margin-bottom: 0; }
       /* All five buttons spaced evenly edge to edge. They can't be, while
          the middle three sit inside .player-controls-center -- that makes
@@ -2020,7 +2020,7 @@
          0 (column-gap only), so without it the title sat flush against
          the cover's bottom edge. */
       .player-title          { grid-column: 1 / -1; grid-row: 6; margin-top: 30px; }
-      .player-artist         { grid-column: 1 / -1; grid-row: 7; }
+      .player-artist         { grid-column: 1; grid-row: 7; margin-bottom: 6px; align-self: end; }
       .player-progress-track { grid-column: 1 / -1; grid-row: 9; }
       .player-time-row       { grid-column: 1 / -1; grid-row: 10; }
 
