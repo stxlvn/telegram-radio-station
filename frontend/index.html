@@ -1214,13 +1214,15 @@
       line-height: 1.55;
       color: var(--md-sys-color-on-surface-variant);
       white-space: pre-line;
-      /* Visible window only -- the text itself is untouched, it just
-         scrolls (with the fade edges below marking that there's more).
-         Kept short deliberately: this box is what decides how far down
-         "Далее в эфире" starts, and the page is meant to open with no
-         scroll of its own on a common laptop viewport. */
+      /* Visible window only, clipped rather than scrollable: the "read
+         more" link below reveals the rest (see .description-expanded),
+         so a scrollbar here would be a second, competing way to reach
+         the same text. The bottom fade marks that there's more. Kept
+         short deliberately -- this box decides how far down "Далее в
+         эфире" starts, and the page is meant to open with no scroll of
+         its own on a common laptop viewport. */
       height: 120px;
-      overflow-y: auto;
+      overflow: hidden;
       text-align: justify;
       padding-right: 6px;
       /* Fade edges toggled via JS (see updateDescriptionFade) based on
@@ -1249,6 +1251,42 @@
         to bottom, transparent, black 28px, black calc(100% - 28px), transparent
       );
     }
+    /* Expanded: the description takes over the panel -- the queue list
+       and the YouTube button below it step aside rather than the page
+       growing a scrollbar, which is the whole reason the collapsed box
+       is clipped to a fixed height in the first place. The text keeps
+       its own overflow:auto here only as a backstop for a description
+       long enough to outrun even the full panel. */
+    /* Absolute, not flex:1 -- as an in-flow item its full text height
+       still counted toward .queue-panel's intrinsic height, which
+       .layout's align-items:stretch then propagated into the page (a
+       long description grew the page by 1300px instead of scrolling
+       inside the panel). Out of flow it contributes nothing, so the
+       panel keeps the height the player column gives it and inset:0
+       fills exactly that. */
+    .queue-panel { position: relative; }
+    .queue-panel.description-expanded .queue-description-panel {
+      position: absolute;
+      /* Matches .queue-panel's own padding: an absolute box resolves its
+         insets against the padding *box*, so inset:0 would sit on top of
+         that padding and the "ОПИСАНИЕ" heading got clipped on the left
+         by the panel's overflow:hidden. */
+      inset: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 0;
+    }
+    .queue-panel.description-expanded .queue-description-text {
+      flex: 1;
+      min-height: 0;
+      height: auto;
+      overflow-y: auto;
+    }
+    .queue-panel.description-expanded .queue-list-wrap,
+    .queue-panel.description-expanded #video-toggle-row { display: none; }
+    /* Only worth offering when something is actually cut off -- toggled
+       from JS alongside the fade (see updateDescriptionFade). */
+    .queue-description-expand[hidden] { display: none; }
     .queue-description-translate {
       display: block;
       margin-top: 10px;
@@ -2359,6 +2397,7 @@
     <div id="queue-description-panel" class="queue-description-panel">
       <h2>Описание</h2>
       <div id="queue-description-text" class="queue-description-text"></div>
+      <button type="button" id="queue-description-expand" class="queue-description-translate queue-description-expand" hidden aria-expanded="false">Читать полностью</button>
       <button type="button" id="queue-description-translate" class="queue-description-translate">Перевести на русский</button>
       <!-- Lives under the description rather than in the player column.
            Desktop only either way -- mobile has its own YouTube button on
@@ -3296,6 +3335,7 @@
     // (no tap needed) under the queue panel -- see .queue-description-panel.
     const queueDescriptionText = document.getElementById('queue-description-text');
     const queueDescriptionTranslateBtn = document.getElementById('queue-description-translate');
+    const queueDescriptionExpandBtn = document.getElementById('queue-description-expand');
     let queueDescriptionOriginalText = '';
     let queueDescriptionShowingTranslation = false;
 
@@ -3307,9 +3347,24 @@
       const hasBelow = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
       el.classList.toggle('fade-top', hasAbove);
       el.classList.toggle('fade-bottom', hasBelow);
+      // The "read more" link only makes sense while something is
+      // actually cut off. Measured against the collapsed box, so it has
+      // to be read before expanding -- once expanded the link has to stay
+      // up regardless (it's the only way back).
+      if (queueDescriptionExpandBtn && !queuePanel.classList.contains('description-expanded')) {
+        queueDescriptionExpandBtn.hidden = !hasBelow;
+      }
     }
     queueDescriptionText.addEventListener('scroll', updateDescriptionFade);
     window.addEventListener('resize', updateDescriptionFade);
+
+    queueDescriptionExpandBtn.addEventListener('click', () => {
+      const expanded = queuePanel.classList.toggle('description-expanded');
+      queueDescriptionExpandBtn.textContent = expanded ? 'Свернуть' : 'Читать полностью';
+      queueDescriptionExpandBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      if (!expanded) queueDescriptionText.scrollTop = 0;
+      updateDescriptionFade();
+    });
 
     // Cheap heuristic, no network call needed -- counts Cyrillic vs Latin
     // letters and goes with whichever the text actually has more of.
@@ -3328,6 +3383,12 @@
       const displayText = currentDescriptionText || 'Описания нет';
       queueDescriptionText.textContent = displayText;
       queueDescriptionText.scrollTop = 0;
+      // Collapse on a track change: what was expanded is now a different
+      // track's description, and leaving it open would keep the queue
+      // hidden indefinitely across every track that follows.
+      queuePanel.classList.remove('description-expanded');
+      queueDescriptionExpandBtn.textContent = 'Читать полностью';
+      queueDescriptionExpandBtn.setAttribute('aria-expanded', 'false');
       updateDescriptionFade();
       playerDescriptionText.textContent = displayText;
       queueDescriptionOriginalText = currentDescriptionText;
