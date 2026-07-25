@@ -1219,7 +1219,7 @@
          Kept short deliberately: this box is what decides how far down
          "Далее в эфире" starts, and the page is meant to open with no
          scroll of its own on a common laptop viewport. */
-      height: 190px;
+      height: 120px;
       overflow-y: auto;
       text-align: justify;
       padding-right: 6px;
@@ -1934,6 +1934,19 @@
          it (see .main-cards/.queue-panel), rather than the bar shrinking
          down to the content. */
       .top-bar { justify-content: flex-start; align-items: center; gap: 28px; }
+      /* Zoom has to magnify this page, not re-flow it. Browser zoom
+         shrinks the CSS-pixel viewport, and without a floor the columns
+         just kept compressing: the cover (360px) and queue (380px) hold
+         their size, the fluid middle column collapses, and the transport
+         -- which can't shrink without going oval, see flex-shrink:0
+         below -- spills out of its column and lands on top of the
+         description. A min-width stops the compression, so past this
+         point the page scrolls sideways instead, which is what zooming
+         a fixed layout should do.
+         1236 = cover 360 + 40 gap + transport 436 (play 180 + 4x64)
+         + 20 gap + queue panel 380. */
+      .layout, .top-bar { min-width: 1236px; }
+      .main-cards { min-width: 836px; }
       .top-bar-title { display: block; height: 30px; }
       .top-tabs { display: flex; }
       #admin-link { margin-left: auto; }
@@ -1994,35 +2007,28 @@
          where the mobile-sized buttons read as undersized. Play gets a
          proportionally larger bump again so it stays clearly the primary
          action among five otherwise equal-weight buttons. */
-      /* Sized as a share of the row, capped in px, with aspect-ratio
-         holding them round -- three problems at once:
-         - flex-shrink was squashing width only while height stayed put,
-           turning every circle into an ellipse (measured 74x180 for play
-           at a 1100px viewport). flex-shrink:0 + aspect-ratio fixes the
-           shape; min() keeps them inside the row instead of overflowing.
-         - a vw-based version of the same fix scaled inconsistently under
-           browser zoom: zooming shrinks the CSS-pixel viewport, so vw
-           sizes drift against the px-sized boxes around them. A
-           percentage resolves against this row, which is itself px-based,
-           so everything scales together the way zoom expects.
-         - height:auto + aspect-ratio rather than a matching percentage,
-           since a percentage height would resolve against the row's
-           height, not its width. */
+      /* Fixed px, deliberately -- browser zoom should magnify this page,
+         not re-proportion it. Zoom shrinks the CSS-pixel viewport, so
+         anything sized in vw (or as a percentage of a viewport-derived
+         box) gets *smaller* in CSS px as you zoom in and ends up holding
+         its apparent size while the px-sized type around it grows. px
+         everywhere means one uniform scale-up, which is what a magnifier
+         does.
+         flex-shrink:0 + aspect-ratio still needed: as flex items in a
+         row that narrows, these were being squashed on width only while
+         height stayed put, turning every circle into an ellipse
+         (measured 74x180 for play at a 1100px viewport). */
       .player-ctrl-btn, .player-play-btn { flex-shrink: 0; height: auto; aspect-ratio: 1; }
-      .player-ctrl-btn { width: min(64px, 12%); }
+      .player-ctrl-btn { width: 64px; }
       /* The volume button isn't a direct child of the row -- it sits in
-         .player-volume-wrap (which anchors the slider popup), so a
-         percentage on the button resolved against that wrapper's own
-         content-derived width and collapsed it to a dot. The wrapper
-         takes the sizing instead, and the button fills it. */
-      .player-volume-wrap { flex-shrink: 0; width: min(64px, 12%); }
+         .player-volume-wrap (which anchors the slider popup), so sizing
+         has to land on the wrapper or the row treats it as the flex item
+         and the button collapses. */
+      .player-volume-wrap { flex-shrink: 0; width: 64px; }
       .player-volume-wrap .player-ctrl-btn { width: 100%; }
-      /* Proportional to the button, not fixed px -- a fixed glyph set a
-         floor the button could not shrink past, so on narrow windows the
-         box went out of square (measured 30x38) despite aspect-ratio. */
-      .player-ctrl-btn svg { width: 60%; height: 60%; }
-      .player-play-btn { width: min(180px, 33%); }
-      .player-play-btn svg { width: 32%; height: 32%; }
+      .player-play-btn { width: 180px; }
+      .player-ctrl-btn svg { width: 38px; height: 38px; }
+      .player-play-btn svg { width: 56px; height: 56px; }
       .player-controls  { grid-column: 2; grid-row: 2; width: 100%; justify-content: space-between; margin-bottom: 0; }
       /* All five buttons spaced evenly edge to edge. They can't be, while
          the middle three sit inside .player-controls-center -- that makes
