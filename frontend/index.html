@@ -1946,6 +1946,15 @@
          1236 = cover 360 + 40 gap + transport 436 (play 180 + 4x64)
          + 20 gap + queue panel 380. */
       .layout, .top-bar { min-width: 1236px; }
+      /* "safe" matters once that min-width can exceed the viewport:
+         plain center overflows an oversized item equally on both sides,
+         and the left half ends up before scroll position 0 -- unreachable
+         and visibly clipped (the station logo lost its first letter under
+         zoom). safe center falls back to start alignment exactly in that
+         case, so the overflow all goes to the right where the horizontal
+         scrollbar can actually reach it. Identical to plain center
+         whenever the content fits. */
+      body { align-items: safe center; }
       .main-cards { min-width: 836px; }
       .top-bar-title { display: block; height: 30px; }
       .top-tabs { display: flex; }
