@@ -15,7 +15,15 @@ self.addEventListener("fetch", (event) => {
   // Leaving this request unintercepted (no respondWith call) hands it
   // straight to the browser's normal network stack instead, where auth
   // prompts work as expected.
-  if (new URL(event.request.url).pathname.startsWith("/admin")) {
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith("/admin")) {
+    return;
+  }
+  // The audio stream lives on its own host, deliberately outside
+  // Cloudflare, precisely so nothing sits between the listener and the
+  // origin holding an endless response open. Routing it back through
+  // this worker's own fetch() would reintroduce exactly that middleman.
+  if (url.hostname !== self.location.hostname) {
     return;
   }
   event.respondWith(fetch(event.request));

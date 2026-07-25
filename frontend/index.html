@@ -2380,11 +2380,11 @@
       </div>
 
       <div class="side-links side-links-lower stagger-item delay-4">
-        <a href="/radio/stream" target="_blank">MP3-поток</a>
+        <a href="https://stream.your-domain.tld/radio/stream" target="_blank">MP3-поток</a>
         <span class="side-links-dot">·</span>
         <a href="/playlist.m3u" download>M3U</a>
         <span class="side-links-dot">·</span>
-        <a href="/radio/stream.flac" target="_blank">FLAC-поток</a>
+        <a href="https://stream.your-domain.tld/radio/stream.flac" target="_blank">FLAC-поток</a>
         <span class="side-links-dot">·</span>
         <a href="/playlist-flac.m3u" download>FLAC M3U</a>
       </div>
@@ -2561,13 +2561,29 @@
     }
     refreshVolumeIcon(savedVolume);
 
-    const STREAM_URLS = { mp3: '/radio/stream', flac: '/radio/stream.flac' };
+    // Absolute, on a dedicated host that is deliberately NOT behind
+    // Cloudflare (DNS-only). Cloudflare never sees an endless audio
+    // response as "complete", so it kept pulling the stream from the
+    // origin long after the listener had gone: every visit left a
+    // permanent phantom connection and Icecast counted each as a
+    // listener (measured 66 of 69 "listeners" were orphans, arriving one
+    // per 10s and never leaving, against 11 real client connections).
+    // The site itself stays behind Cloudflare -- only these long-lived
+    // connections are routed around it.
+    const STREAM_HOST = 'https://stream.your-domain.tld';
+    const STREAM_URLS = {
+      mp3: STREAM_HOST + '/radio/stream',
+      flac: STREAM_HOST + '/radio/stream.flac',
+    };
     // Plain /radio/stream(.flac) is a raw chunked live feed -- no
     // Content-Length or byte ranges, so browsers can't seek it at all.
     // /radio/hls(-flac)/live.m3u8 is a short rolling-window HLS mirror of
     // the same feed (Liquidsoap writes immutable ~6s segments), which gives
     // real seekable ranges, one mirror per quality tier.
-    const HLS_URLS = { mp3: '/radio/hls/live.m3u8', flac: '/radio/hls-flac/live.m3u8' };
+    const HLS_URLS = {
+      mp3: STREAM_HOST + '/radio/hls/live.m3u8',
+      flac: STREAM_HOST + '/radio/hls-flac/live.m3u8',
+    };
     // audio.canPlayType('application/vnd.apple.mpegurl') is supposed to be
     // how you feature-detect native HLS support, but Chromium returns
     // "maybe" for it too despite having zero actual ability to play an
