@@ -340,7 +340,11 @@ PAGE_TEMPLATE = """
 
   <div class="card">
     <h2>Добавить треки</h2>
-    <form id="add-form">
+    <!-- method/enctype are a fallback only: the handler below sends
+         this over XHR and calls preventDefault. Without them a native
+         submit degrades to a GET, putting the file field and the links
+         in the URL and queueing nothing. -->
+    <form id="add-form" method="post" enctype="multipart/form-data" action="upload">
       <label>Файлы (можно выбрать несколько)</label>
       <input type="file" name="audio_files" multiple accept=".mp3,.flac,.m4a,.ogg,.wav,.aac" id="audio-files-input">
 
@@ -602,7 +606,15 @@ PAGE_TEMPLATE = """
     addForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const files = Array.from(filesInput.files);
-      const links = channelLinksInput.value.split('\n').map((s) => s.trim()).filter(Boolean);
+      // The newline separator is written escaped twice on purpose. This
+      // template is a plain (non-raw) Python string, so one level of
+      // escaping is consumed before the browser ever sees it -- written
+      // singly it arrived as a real line break inside the string literal,
+      // a SyntaxError that killed this entire script block and with it the
+      // submit handler. The form then submitted natively, which is why the
+      // page reloaded and nothing was queued. Keep any backslash sequence
+      // added below doubled for the same reason.
+      const links = channelLinksInput.value.split('\\n').map((s) => s.trim()).filter(Boolean);
       if (!files.length && !links.length) {
         channelLinksInput.setCustomValidity('Выберите файлы или укажите хотя бы одну ссылку');
         channelLinksInput.reportValidity();
