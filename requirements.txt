@@ -1,4 +1,10 @@
 telethon
+# Not optional in practice: without it Telethon does MtProto's AES-IGE in
+# pure Python and the download itself becomes CPU-bound. Measured on the
+# backend, same 40 MiB lossless file: 54s (30s of it CPU) without, 26s
+# with, and 8s once the chunk size went up too (see DOWNLOAD_REQUEST_SIZE
+# in backend/admin_app.py).
+cryptg
 flask
 werkzeug
 aiohttp

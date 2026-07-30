@@ -6,6 +6,7 @@ import re
 import uuid
 import socket
 import asyncio
+import threading
 
 from flask import Flask, request, redirect, url_for, render_template_string, flash
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -40,6 +41,51 @@ telegram_channel = os.environ.get("TELEGRAM_CHANNEL")
 # theoretical one. This is a plain file copy of an already-authorized
 # session (see the deploy notes), never a fresh interactive login here.
 telegram_admin_session_path = os.environ.get("TELEGRAM_ADMIN_SESSION_PATH", "/opt/radio/session_admin")
+
+# 1 MiB per upload.getFile call -- Telegram's own ceiling (the limit has to
+# divide 1048576 and be a multiple of 4096), and download_media() never
+# asks for more than 128 KiB at a time on its own. Chunks are requested
+# one after another, so the per-request round trip is the whole cost:
+# measured on this host, the same 40 MiB lossless file took 23.6s at the
+# default 128 KiB and 9.7s at 1 MiB. (The other half of that story was
+# cryptg missing from the venv, which left Telethon doing AES-IGE in pure
+# Python -- 54s for the same file, 30s of it pure CPU. It's in
+# requirements.txt for that reason; keep it installed.)
+DOWNLOAD_REQUEST_SIZE = 1024 * 1024
+
+# Byte counts for /add_by_link downloads still in flight, keyed by the job
+# id the page makes up per link. A lossless file takes tens of seconds and
+# the POST reports nothing until it returns, so the page polls
+# /add_progress for something to put in the progress bar instead of
+# sitting at 0% for the whole download. In memory on purpose: waitress
+# serves this app from one process, and a byte count that outlived a
+# restart would be meaningless anyway.
+add_jobs = {}
+add_jobs_lock = threading.Lock()
+# Long enough to cover a slow download that nobody is watching any more
+# (closing the page just stops the polling; nothing tells us about it),
+# short enough that abandoned entries don't pile up.
+ADD_JOB_TTL = 900
+
+
+def set_add_progress(job, **fields):
+    if not job:
+        return
+    now = time.time()
+    with add_jobs_lock:
+        record = add_jobs.get(job, {})
+        record.update(fields)
+        record["updated"] = now
+        add_jobs[job] = record
+        for key in [k for k, v in add_jobs.items() if now - v.get("updated", now) > ADD_JOB_TTL]:
+            del add_jobs[key]
+
+
+def clear_add_progress(job):
+    if not job:
+        return
+    with add_jobs_lock:
+        add_jobs.pop(job, None)
 
 # Accepts a full message link (https://t.me/<channel>/<id>, with or
 # without a leading https://, with or without "www."), or just the bare
@@ -564,10 +610,26 @@ PAGE_TEMPLATE = """
       });
     }
 
+    function newJobId() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return String(Date.now()) + '-' + Math.random().toString(36).slice(2);
+    }
+
+    function formatMb(bytes) {
+      return (bytes / 1048576).toFixed(1);
+    }
+
     // Several links are added as separate requests in sequence (not all
     // at once -- a Telegram flood-wait from hammering it concurrently
     // would be a worse failure mode than just taking longer), each one
     // only starting once the previous has actually finished downloading.
+    //
+    // The bar used to jump straight from 0% to 100% for a single link and
+    // stand still for the whole download in between, which reads as a
+    // hung page -- the request simply reports nothing until it returns,
+    // and a lossless file takes a while. So each link gets a job id, the
+    // server publishes the bytes it has under that id, and this polls
+    // /add_progress for something real to show while it waits.
     async function addLinks(links) {
       // Continues from wherever the files phase (if any) just landed, so
       // the two phases don't compete for the same single insertion point
@@ -575,14 +637,40 @@ PAGE_TEMPLATE = """
       let afterId = afterSelect.value;
       const results = [];
       for (let i = 0; i < links.length; i++) {
+        const job = newJobId();
+        // Each link owns its own slice of the bar, so several links still
+        // read as one run from 0 to 100 rather than restarting per link.
+        const share = 1 / links.length;
+        const base = i * share;
+        const positionSuffix = links.length > 1 ? ` (${i + 1} из ${links.length})` : '';
         uploadTitle.textContent = 'Добавляю треки из канала...';
-        uploadSub.textContent = `Ищу трек ${i + 1} из ${links.length} в канале` +
-          (links.length > 1 ? ' (большие lossless-файлы могут занять время)' : '') + '...';
+        uploadSub.textContent = 'Ищу трек в канале' + positionSuffix + '...';
+        setProgress(Math.round(base * 100));
+        const poll = setInterval(async () => {
+          try {
+            const r = await fetch('add_progress?job=' + encodeURIComponent(job), { cache: 'no-store' });
+            const p = await r.json();
+            // An unknown job is normal at both ends: the first poll can
+            // beat the download starting, and the entry is dropped as
+            // soon as the track is queued.
+            if (!p.found) return;
+            if (p.stage === 'download' && p.total) {
+              const fraction = Math.min(1, p.done / p.total);
+              setProgress(Math.round((base + share * fraction) * 100));
+              uploadSub.textContent = 'Скачиваю' + positionSuffix + ': ' +
+                formatMb(p.done) + ' из ' + formatMb(p.total) + ' МБ...';
+            } else if (p.stage === 'tags') {
+              uploadSub.textContent = 'Читаю теги и ставлю в очередь' + positionSuffix + '...';
+            }
+          } catch (err) {
+            // A missed poll needs no handling -- the next one covers it.
+          }
+        }, 600);
         try {
           const res = await fetch('add_by_link', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ link: links[i], after: afterId }),
+            body: JSON.stringify({ link: links[i], after: afterId, job: job }),
           });
           const data = await res.json();
           if (data.ok) {
@@ -593,6 +681,8 @@ PAGE_TEMPLATE = """
           }
         } catch (err) {
           results.push({ ok: false, link: links[i], error: 'ошибка сети' });
+        } finally {
+          clearInterval(poll);
         }
         setProgress(Math.round(((i + 1) / links.length) * 100));
       }
@@ -862,10 +952,12 @@ def upload():
     return redirect(url_for("index"))
 
 
-async def _fetch_channel_track(message_id, tmp_path):
+async def _fetch_channel_track(message_id, tmp_path, job=None):
     client = TelegramClient(telegram_admin_session_path, int(telegram_api_id), telegram_api_hash)
+    set_add_progress(job, stage="connect", done=0, total=0)
     await client.start()
     try:
+        set_add_progress(job, stage="lookup")
         msg = await client.get_messages(telegram_channel, ids=message_id)
         if msg is None:
             return None, "Сообщение не найдено (удалено или неверный id)"
@@ -874,9 +966,22 @@ async def _fetch_channel_track(message_id, tmp_path):
         file_title = getattr(msg.file, "title", None) or ""
         file_performer = getattr(msg.file, "performer", None) or ""
         file_name = getattr(msg.file, "name", None) or ""
-        path = await client.download_media(msg, file=tmp_path)
-        if not path:
+        # iter_download rather than download_media: it's the only one of
+        # the two that takes request_size, which is where most of the time
+        # goes (see DOWNLOAD_REQUEST_SIZE). Writing the chunks here also
+        # gives an exact byte count to publish as progress.
+        total = getattr(msg.file, "size", 0) or 0
+        done = 0
+        set_add_progress(job, stage="download", done=0, total=total,
+                         title=file_title or file_name)
+        with open(tmp_path, "wb") as fh:
+            async for chunk in client.iter_download(msg, request_size=DOWNLOAD_REQUEST_SIZE):
+                fh.write(chunk)
+                done += len(chunk)
+                set_add_progress(job, done=done)
+        if not done:
             return None, "Не удалось скачать файл"
+        set_add_progress(job, stage="tags", done=total or done, total=total or done)
         return {"file_title": file_title, "file_performer": file_performer, "file_name": file_name}, None
     finally:
         await client.disconnect()
@@ -892,8 +997,10 @@ def add_by_link():
         return {"ok": False, "error": "Добавление по ссылке не настроено на сервере (нет TELEGRAM_* переменных)"}, 400
 
     data = request.get_json(silent=True) or {}
+    job = str(data.get("job", "") or "")[:64]
     message_id, err = parse_telegram_link(data.get("link", ""))
     if err:
+        clear_add_progress(job)
         return {"ok": False, "error": err}, 400
 
     os.makedirs(queue_dir, exist_ok=True)
@@ -902,7 +1009,7 @@ def add_by_link():
     final_path = os.path.join(queue_dir, f"{new_id}.audio")
 
     try:
-        info, err = asyncio.run(_fetch_channel_track(message_id, tmp_path))
+        info, err = asyncio.run(_fetch_channel_track(message_id, tmp_path, job))
     except Exception as e:
         print(f"add_by_link failed: {e}", file=sys.stderr)
         info, err = None, f"Ошибка Telegram: {e}"
@@ -910,6 +1017,7 @@ def add_by_link():
     if err:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+        clear_add_progress(job)
         return {"ok": False, "error": err}, 400
 
     artist, title = extract_tags(tmp_path)
@@ -934,7 +1042,21 @@ def add_by_link():
     base_mtime = compute_insert_base_mtime(after_id)
     os.utime(final_path, (base_mtime, base_mtime))
 
+    clear_add_progress(job)
     return {"ok": True, "id": new_id, "title": title, "artist": artist}
+
+
+@app.route("/add_progress")
+def add_progress():
+    # Polled by the page while an /add_by_link POST is still running, so
+    # the progress bar has real bytes to follow. An unknown job id is a
+    # normal answer, not an error: the poll can start a moment before the
+    # POST reaches the download, and keeps firing until the POST resolves
+    # (by which point the entry is deliberately gone again).
+    job = request.args.get("job", "")
+    with add_jobs_lock:
+        record = dict(add_jobs.get(job, {}))
+    return {"ok": True, "found": bool(record), **record}
 
 
 if __name__ == "__main__":
