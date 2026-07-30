@@ -87,6 +87,71 @@ def clear_add_progress(job):
     with add_jobs_lock:
         add_jobs.pop(job, None)
 
+
+# One Telethon client for the whole process, living on its own event loop
+# in a background thread, instead of a fresh TelegramClient (and so a
+# fresh SQLite connection to the same .session file) per request.
+#
+# Two of those overlapping is not theoretical: caught live, a second add
+# arriving while one was downloading failed outright with "database is
+# locked", and a third took 45s where the download itself took 8 --
+# waiting on the same lock. One client also drops ~0.4s of connect
+# handshake from every add, and keeps Telegram seeing a single session,
+# which is what it expects of one account.
+#
+# Adds are serialized on top of that (tg_work_lock). Nothing here needs
+# them to run in parallel -- the page submits links one at a time anyway
+# -- and hammering Telegram concurrently earns a flood-wait, which is a
+# worse failure than simply taking turns.
+tg_loop = None
+tg_loop_lock = threading.Lock()
+tg_client = None
+tg_work_lock = threading.Lock()
+# Generous: this only has to outlast the longest legitimate download, and
+# nginx/waitress (600s) will give up on the request well before it does.
+TG_WORK_TIMEOUT = 900
+
+
+def ensure_tg_loop():
+    global tg_loop
+    with tg_loop_lock:
+        if tg_loop is None:
+            loop = asyncio.new_event_loop()
+            threading.Thread(
+                target=loop.run_forever, name="telethon-loop", daemon=True
+            ).start()
+            tg_loop = loop
+        return tg_loop
+
+
+async def get_tg_client():
+    # Runs on the shared loop, and only ever with tg_work_lock held, so
+    # there is no race to guard here beyond the None check itself.
+    global tg_client
+    if tg_client is None:
+        client = TelegramClient(telegram_admin_session_path, int(telegram_api_id), telegram_api_hash)
+        # An already-authorized session file, copied in at deploy time --
+        # start() only connects, it never has anything to ask for here.
+        await client.start()
+        tg_client = client
+    elif not tg_client.is_connected():
+        # Telethon reconnects on its own while a call is in flight; this
+        # covers the gap between calls, where nothing is driving it.
+        await tg_client.connect()
+    return tg_client
+
+
+def run_tg(coro_factory):
+    # Takes a factory rather than a coroutine so nothing is created until
+    # this thread's turn actually comes: a coroutine built up front and
+    # then abandoned (a lock wait that raises, a caller that gives up)
+    # would only surface as a "never awaited" warning.
+    loop = ensure_tg_loop()
+    with tg_work_lock:
+        future = asyncio.run_coroutine_threadsafe(coro_factory(), loop)
+        return future.result(TG_WORK_TIMEOUT)
+
+
 # Accepts a full message link (https://t.me/<channel>/<id>, with or
 # without a leading https://, with or without "www."), or just the bare
 # numeric message ID for anyone who already knows it. Validates the
@@ -953,38 +1018,37 @@ def upload():
 
 
 async def _fetch_channel_track(message_id, tmp_path, job=None):
-    client = TelegramClient(telegram_admin_session_path, int(telegram_api_id), telegram_api_hash)
+    # No disconnect here on purpose -- the client is process-wide and
+    # shared (see get_tg_client); tearing it down after every add is what
+    # this replaced.
     set_add_progress(job, stage="connect", done=0, total=0)
-    await client.start()
-    try:
-        set_add_progress(job, stage="lookup")
-        msg = await client.get_messages(telegram_channel, ids=message_id)
-        if msg is None:
-            return None, "Сообщение не найдено (удалено или неверный id)"
-        if not (msg.audio or msg.voice):
-            return None, "В этом сообщении нет аудио"
-        file_title = getattr(msg.file, "title", None) or ""
-        file_performer = getattr(msg.file, "performer", None) or ""
-        file_name = getattr(msg.file, "name", None) or ""
-        # iter_download rather than download_media: it's the only one of
-        # the two that takes request_size, which is where most of the time
-        # goes (see DOWNLOAD_REQUEST_SIZE). Writing the chunks here also
-        # gives an exact byte count to publish as progress.
-        total = getattr(msg.file, "size", 0) or 0
-        done = 0
-        set_add_progress(job, stage="download", done=0, total=total,
-                         title=file_title or file_name)
-        with open(tmp_path, "wb") as fh:
-            async for chunk in client.iter_download(msg, request_size=DOWNLOAD_REQUEST_SIZE):
-                fh.write(chunk)
-                done += len(chunk)
-                set_add_progress(job, done=done)
-        if not done:
-            return None, "Не удалось скачать файл"
-        set_add_progress(job, stage="tags", done=total or done, total=total or done)
-        return {"file_title": file_title, "file_performer": file_performer, "file_name": file_name}, None
-    finally:
-        await client.disconnect()
+    client = await get_tg_client()
+    set_add_progress(job, stage="lookup")
+    msg = await client.get_messages(telegram_channel, ids=message_id)
+    if msg is None:
+        return None, "Сообщение не найдено (удалено или неверный id)"
+    if not (msg.audio or msg.voice):
+        return None, "В этом сообщении нет аудио"
+    file_title = getattr(msg.file, "title", None) or ""
+    file_performer = getattr(msg.file, "performer", None) or ""
+    file_name = getattr(msg.file, "name", None) or ""
+    # iter_download rather than download_media: it's the only one of the
+    # two that takes request_size, which is where most of the time goes
+    # (see DOWNLOAD_REQUEST_SIZE). Writing the chunks here also gives an
+    # exact byte count to publish as progress.
+    total = getattr(msg.file, "size", 0) or 0
+    done = 0
+    set_add_progress(job, stage="download", done=0, total=total,
+                     title=file_title or file_name)
+    with open(tmp_path, "wb") as fh:
+        async for chunk in client.iter_download(msg, request_size=DOWNLOAD_REQUEST_SIZE):
+            fh.write(chunk)
+            done += len(chunk)
+            set_add_progress(job, done=done)
+    if not done:
+        return None, "Не удалось скачать файл"
+    set_add_progress(job, stage="tags", done=total or done, total=total or done)
+    return {"file_title": file_title, "file_performer": file_performer, "file_name": file_name}, None
 
 
 @app.route("/add_by_link", methods=["POST"])
@@ -1009,7 +1073,7 @@ def add_by_link():
     final_path = os.path.join(queue_dir, f"{new_id}.audio")
 
     try:
-        info, err = asyncio.run(_fetch_channel_track(message_id, tmp_path, job))
+        info, err = run_tg(lambda: _fetch_channel_track(message_id, tmp_path, job))
     except Exception as e:
         print(f"add_by_link failed: {e}", file=sys.stderr)
         info, err = None, f"Ошибка Telegram: {e}"
