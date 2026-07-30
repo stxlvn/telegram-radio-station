@@ -1265,7 +1265,13 @@
        panel keeps the height the player column gives it and inset:0
        fills exactly that. */
     .queue-panel { position: relative; }
-    .queue-panel.description-expanded .queue-description-panel {
+    /* Also kept absolute for the length of the *collapse*, not only while
+       expanded (see .description-animating below): returning to flow at
+       the start of the collapse would put the still-tall text box back
+       into the page's height calculation for as long as the animation
+       runs -- exactly the growth this overlay exists to avoid. */
+    .queue-panel.description-expanded .queue-description-panel,
+    .queue-panel.description-animating .queue-description-panel {
       position: absolute;
       /* Matches .queue-panel's own padding: an absolute box resolves its
          insets against the padding *box*, so inset:0 would sit on top of
@@ -1282,8 +1288,44 @@
       height: auto;
       overflow-y: auto;
     }
+    /* Height is what animates, and in the expanded state that height
+       comes from flex:1 -- there is nothing in the CSS to animate
+       between, and flex-basis:0% would win over a height value anyway.
+       flex:none hands sizing back to the height setDescriptionExpanded
+       animates (it measures the real flex:1 height first, so the motion
+       lands exactly where the expanded rules above settle). The keyframes
+       themselves live in the script, not here, for the reason given
+       there. overflow stays hidden the whole way so a scrollbar doesn't
+       flash in and out mid-animation. */
+    .queue-panel.description-animating .queue-description-text {
+      flex: none;
+      overflow: hidden;
+    }
+    /* visibility, not display:none as before: display drops these from
+       flow, which changes .queue-panel's own height the instant the
+       animation starts and makes the growing text jump. Hidden keeps the
+       collapsed geometry intact while still taking them out of the tab
+       order and away from the pointer. Out quickly (the growing text is
+       about to cover them anyway), back in only once it has shrunk
+       clear again -- hence the delay on the collapse direction. */
+    .queue-list-wrap,
+    .queue-description-panel #video-toggle-row {
+      transition: opacity 0.24s var(--md-sys-motion-easing-emphasized) 0.32s;
+    }
     .queue-panel.description-expanded .queue-list-wrap,
-    .queue-panel.description-expanded #video-toggle-row { display: none; }
+    .queue-panel.description-expanded #video-toggle-row {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.12s var(--md-sys-motion-easing-emphasized),
+                  visibility 0s linear 0.12s;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .queue-panel.description-animating .queue-description-text,
+      .queue-list-wrap,
+      .queue-description-panel #video-toggle-row,
+      .queue-panel.description-expanded .queue-list-wrap,
+      .queue-panel.description-expanded #video-toggle-row { transition: none; }
+    }
     /* Only worth offering when something is actually cut off -- toggled
        from JS alongside the fade (see updateDescriptionFade). */
     .queue-description-expand[hidden] { display: none; }
@@ -3374,12 +3416,63 @@
     queueDescriptionText.addEventListener('scroll', updateDescriptionFade);
     window.addEventListener('resize', updateDescriptionFade);
 
-    queueDescriptionExpandBtn.addEventListener('click', () => {
-      const expanded = queuePanel.classList.toggle('description-expanded');
+    // Measure-then-animate rather than a plain class swap: the expanded
+    // height is whatever flex:1 resolves to inside the overlay panel, so
+    // there is no pair of values in the CSS to animate between. Apply the
+    // end state, read the height the browser actually settled on, then
+    // animate from the height it had a moment ago to that.
+    //
+    // element.animate(), not a CSS transition: confirmed directly
+    // (headless, measured frame by frame) a transition only ran on the
+    // way *open*. Collapsing left the reversed direction to whichever
+    // style recalc the from-value happened to be captured at, and it was
+    // consistently captured as the already-collapsed 120px, so the box
+    // snapped shut with no motion at all. An explicit keyframe pair has
+    // no from-value to guess at. Duration and easing are read from the
+    // page's own motion tokens so this stays one source of truth with
+    // every other animation here.
+    const descriptionAnimStyle = getComputedStyle(document.documentElement);
+    const DESCRIPTION_ANIM_MS =
+      parseFloat(descriptionAnimStyle.getPropertyValue('--md-sys-motion-duration-long2')) || 500;
+    const DESCRIPTION_ANIM_EASING =
+      descriptionAnimStyle.getPropertyValue('--md-sys-motion-easing-emphasized').trim() ||
+      'cubic-bezier(0.2, 0, 0, 1)';
+    let descriptionAnim = null;
+    function finishDescriptionAnim() {
+      if (descriptionAnim) {
+        descriptionAnim.cancel();
+        descriptionAnim = null;
+      }
+      queuePanel.classList.remove('description-animating');
+    }
+    function setDescriptionExpanded(expanded) {
+      const el = queueDescriptionText;
+      const startHeight = el.getBoundingClientRect().height;
+      finishDescriptionAnim();
+      queuePanel.classList.toggle('description-expanded', expanded);
+      // Deliberate forced reflow: this read has to happen with the end
+      // state applied and nothing left over from a previous run.
+      const endHeight = el.getBoundingClientRect().height;
       queueDescriptionExpandBtn.textContent = expanded ? 'Свернуть' : 'Читать полностью';
       queueDescriptionExpandBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-      if (!expanded) queueDescriptionText.scrollTop = 0;
-      updateDescriptionFade();
+      if (!expanded) el.scrollTop = 0;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced || Math.abs(endHeight - startHeight) < 1) {
+        updateDescriptionFade();
+        return;
+      }
+      queuePanel.classList.add('description-animating');
+      descriptionAnim = el.animate(
+        [{ height: startHeight + 'px' }, { height: endHeight + 'px' }],
+        { duration: DESCRIPTION_ANIM_MS, easing: DESCRIPTION_ANIM_EASING, fill: 'both' }
+      );
+      descriptionAnim.onfinish = () => {
+        finishDescriptionAnim();
+        updateDescriptionFade();
+      };
+    }
+    queueDescriptionExpandBtn.addEventListener('click', () => {
+      setDescriptionExpanded(!queuePanel.classList.contains('description-expanded'));
     });
 
     // Cheap heuristic, no network call needed -- counts Cyrillic vs Latin
@@ -3402,6 +3495,11 @@
       // Collapse on a track change: what was expanded is now a different
       // track's description, and leaving it open would keep the queue
       // hidden indefinitely across every track that follows.
+      // Reset outright, not animated: this is already a different
+      // track's text, so there is nothing for a collapse animation to
+      // show. finishDescriptionAnim also drops anything a run still in
+      // flight was holding the height at.
+      finishDescriptionAnim();
       queuePanel.classList.remove('description-expanded');
       queueDescriptionExpandBtn.textContent = 'Читать полностью';
       queueDescriptionExpandBtn.setAttribute('aria-expanded', 'false');
