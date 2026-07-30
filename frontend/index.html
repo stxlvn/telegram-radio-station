@@ -295,7 +295,7 @@
       width: 100%;
     }
 
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       .layout { flex-direction: column; align-items: center; }
       /* .main-cards is itself display:flex -- without this it kept the
          desktop row direction even once .layout above it switched to a
@@ -380,7 +380,7 @@
        block, confirmed by actually reading it rather than assuming from
        its visual result. */
     body[data-active-tab="radio"] #queue-panel[data-tab="radio"] { display: flex !important; }
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       /* The admin-panel login icon lives in .top-bar, outside both tabs'
          containers entirely, so nothing above ever touched it -- it kept
          showing on "Радио" too. Per request, admin access belongs with
@@ -390,7 +390,7 @@
       body[data-active-tab="radio"] #admin-link { display: none !important; }
     }
 
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       /* "О канале" is its own dedicated tab/screen rather than one card
          sharing a page with the player, so it no longer needs to be
          squeezed as tightly as when it had to fit under/beside other
@@ -534,7 +534,7 @@
          420px breakpoint's own full padding shorthand. */
       body { padding-bottom: calc(24px + 64px + env(safe-area-inset-bottom)); }
     }
-    @media (max-width: 420px) and (hover: none) {
+    @media (max-width: 420px) and (pointer: coarse) {
       body { padding-bottom: calc(16px + 64px + env(safe-area-inset-bottom)); }
       .layout {
         min-height: calc(100svh - (16px + env(safe-area-inset-top)) - 36px - 20px - (16px + 64px + env(safe-area-inset-bottom)));
@@ -571,7 +571,7 @@
       background: linear-gradient(to bottom, transparent, rgba(37, 27, 26, 0.75));
       pointer-events: none;
     }
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       .bottom-nav { display: flex; }
     }
     .bottom-nav-item {
@@ -983,7 +983,7 @@
       height: 24px;
       width: auto;
     }
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       /* Both flex-based attempts (space-between, then an auto margin)
          ended up entangled with whichever item happened to be visible --
          confirmed directly, each fixed one tab and broke the other.
@@ -1344,7 +1344,7 @@
     /* Mobile reads the description via the cover-tap modal instead (see
        .player-description-text) -- showing it here too was a duplicate,
        not a second place worth having it. */
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       .queue-description-panel { display: none; }
       /* Mobile has its own YouTube button on the mini-player bar instead
          (#np-youtube-btn) -- desktop keeps this row (still the only place
@@ -1417,7 +1417,7 @@
     /* Mobile: expanding takes over the whole screen instead of just
        growing in place -- more room for the cover, easier to reach the
        controls one-handed than a panel wedged into the card's own width. */
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       /* .closing keeps the same fixed full-screen box as .expanded (so it
          stays visible in place) but is added right as .expanded is removed,
          letting opacity/transform actually transition -- position itself
@@ -1473,7 +1473,7 @@
        in a scrollable column on the right. Keyed on max-height rather
        than orientation so a landscape tablet -- plenty of height to
        spare -- keeps the portrait layout instead. */
-    @media (max-width: 1024px) and (max-height: 500px) and (hover: none) {
+    @media (max-width: 1024px) and (max-height: 500px) and (pointer: coarse) {
       /* Same idea as the narrow-portrait rule below (max-width: 420px) --
          the base 320px cap was sized for portrait, where the card itself
          is already that narrow. In landscape the card keeps its full
@@ -1604,7 +1604,7 @@
       transition: transform 0.2s ease;
     }
     .player-description-backdrop.visible .player-description { transform: scale(1); }
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       /* Image + description text + actions can add up to more than the
          viewport on a short phone screen -- the modal itself scrolls as a
          whole rather than clipping anything (desktop never needs this,
@@ -1616,7 +1616,7 @@
        stacked in a column on the right instead of everything piled
        vertically, matching the same side-by-side treatment as the main
        player layout at this breakpoint. */
-    @media (max-width: 1024px) and (max-height: 500px) and (hover: none) {
+    @media (max-width: 1024px) and (max-height: 500px) and (pointer: coarse) {
       .player-description {
         flex-direction: row;
         align-items: center;
@@ -1698,7 +1698,7 @@
     .player-description-text {
       display: none;
     }
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       .player-description-cover { max-height: 45vh; }
       .player-description-text {
         display: block;
@@ -1974,12 +1974,12 @@
        decide the cover's size; hiding the cover here just removes it from
        that layout entirely instead of fighting it for space. */
 
-    @media (max-width: 420px) and (hover: none) {
+    @media (max-width: 420px) and (pointer: coarse) {
       .player-cover-wrap { margin-bottom: 14px; }
       .player-controls-center { gap: 20px; }
     }
 
-    @media (max-width: 1024px) and (hover: none) {
+    @media (max-width: 1024px) and (pointer: coarse) {
       .queue-panel { max-width: 500px; }
       /* .side-links's 24px margin-top is sized for sitting below the much
          taller #player-inline on desktop -- on mobile it sits right below
@@ -2001,13 +2001,26 @@
     /* Desktop: the player is always shown expanded inline in the card, no
        tap-to-expand -- hide the compact trigger bar and its collapse
        button, and force .player-inline visible regardless of .expanded. */
-    /* OR'd with hover:hover/pointer:fine (a real mouse/trackpad) so a
-       desktop Chrome window narrowed by docking DevTools, or just resized
-       small, keeps the desktop layout instead of flipping to the
-       touch-oriented mobile one -- mirrors MOBILE_QUERY in the script
-       below. A real touchscreen at >=1025px (large tablet) still lands
-       here too, same as before this query gained the OR clause. */
-    @media (min-width: 1025px), (hover: hover) and (pointer: fine) {
+    /* OR'd with pointer:fine (a real mouse/trackpad) so a desktop Chrome
+       window narrowed by docking DevTools, or just resized small, keeps
+       the desktop layout instead of flipping to the touch-oriented mobile
+       one -- mirrors MOBILE_QUERY in the script below. A real touchscreen
+       at >=1025px (large tablet) still lands here too, same as before this
+       query gained the OR clause.
+
+       Keyed on pointer rather than hover (and the mobile breakpoints on
+       pointer:coarse rather than hover:none) because Android WebView
+       reports (hover: hover) even on a phone, with no mouse anywhere near
+       it -- measured directly in the app's own WebView: hover=true,
+       pointer=coarse. Chrome on the same device says hover:none, which is
+       why this only ever showed up once the Android app stopped handing
+       the page to Chrome and started hosting it itself: every mobile
+       @media block silently stopped applying, leaving the app on the
+       unscoped layout. pointer: coarse/fine is the one of the two that
+       WebView gets right, and it says the same thing as hover on every
+       real browser, so nothing about the phone or desktop layouts
+       changes. */
+    @media (min-width: 1025px), (pointer: fine) {
       /* TitleBar: logo on the left, its two tabs next to it, admin link
          pushed to the far right by the auto margin. Keeps .top-bar's own
          base 1400px ceiling -- the content row below stretches to meet
@@ -2210,7 +2223,7 @@
       .player-next { display: none !important; }
     }
 
-    @media (max-width: 420px) and (hover: none) {
+    @media (max-width: 420px) and (pointer: coarse) {
       body {
         padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
                  calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
@@ -2230,8 +2243,9 @@
     /* Hover styles only for devices with a real pointer -- on touch, a tap
        triggers :hover with no matching "leave" event, so buttons stayed
        visually stuck in their hovered/pressed look until something else was
-       tapped. Scoping to (hover: hover) keeps this purely a mouse thing. */
-    @media (hover: hover) and (pointer: fine) {
+       tapped. Keyed on pointer, not hover, for the reason given at the
+       desktop breakpoint below. */
+    @media (pointer: fine) {
       .avatar-container:hover { transform: scale(1.05); }
       .btn-telegram:hover {
         background-color: #f5a59e;
@@ -2758,20 +2772,29 @@
 
     function isRunningStandalone() {
       return window.matchMedia('(display-mode: standalone)').matches
-        || window.navigator.standalone === true; // iOS's own (non-standard) flag
+        || window.navigator.standalone === true // iOS's own (non-standard) flag
+        // The Android app hosts this page in its own WebView, where
+        // display-mode is always "browser" -- there is no manifest and no
+        // installed-app concept involved at all. Its User-Agent suffix is
+        // the only thing that distinguishes it, and without this check the
+        // app would both miss its own update banner and be offered an
+        // "install the app" banner from inside the app.
+        || / YourRadioApp\//.test(navigator.userAgent);
     }
 
-    // Bumped by hand alongside app/build.gradle's versionCode on every TWA
+    // Bumped by hand alongside app/build.gradle's versionCode on every app
     // rebuild -- there's no build step tying the two together, so this can
     // drift if a rebuild forgets it (harmless either way: worst case is a
     // missed or a false-positive update prompt, never breakage).
-    const LATEST_TWA_VERSION = 5;
+    const LATEST_TWA_VERSION = 7;
     const UPDATE_BANNER_DISMISSED_KEY = 'updateBannerDismissedForVersion';
 
-    // TWA has no JS bridge back to the native app, so there's no direct way
-    // to ask "what versionCode is actually installed" -- LauncherActivity's
-    // getLaunchingUrl() override appends ?twa_version=N to the start_url
-    // on every cold launch instead, which is the only channel available.
+    // The app tells the page which version it is by appending
+    // ?twa_version=N to the URL it loads on every cold launch. The name
+    // dates from the Trusted Web Activity this app replaced (where
+    // LauncherActivity.getLaunchingUrl() was the only channel available);
+    // the WebView app keeps appending exactly the same parameter, so old
+    // installs and new ones are both understood here.
     // Only ever present right after a fresh app launch, so this only runs
     // once per cold start, not on every resume -- good enough for an update
     // nudge.
@@ -3371,7 +3394,7 @@
     // hover:none is what actually distinguishes a real touch device from
     // a desktop window that merely got narrow (DevTools docked, manual
     // resize, etc) -- same reasoning as the desktop media query above.
-    const MOBILE_QUERY = '(max-width: 1024px) and (hover: none)';
+    const MOBILE_QUERY = '(max-width: 1024px) and (pointer: coarse)';
     // Matches the (max-width: 1024px) and (max-height: 500px) CSS
     // breakpoint for the side-by-side landscape phone layout -- keyed on
     // height, not orientation, so a landscape tablet (plenty of height to
